@@ -1,14 +1,19 @@
 # .goreleaser.yaml
 version: 2
 
+project_name: ops0
+
+env:
+  - GO111MODULE=on
+
 before:
   hooks:
     - go mod tidy
-    - go generate ./...
+    - go mod download
 
 builds:
-  - main: ./main.go
-    id: ops0
+  - id: ops0
+    main: ./main.go
     binary: ops0
     goos:
       - linux
@@ -17,13 +22,25 @@ builds:
     goarch:
       - amd64
       - arm64
+      - "386"
+    goarm:
+      - "7"
+    ignore:
+      - goos: windows
+        goarch: arm64
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w 
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    flags:
+      - -trimpath
 
 archives:
-  - format: tar.gz
+  - id: default
+    format: tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -34,16 +51,84 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - README.md
+      - LICENSE
+      - examples/**/*
 
 checksum:
   name_template: 'checksums.txt'
-
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  algorithm: sha256
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^ci:'
+      - '^build:'
+      - '^style:'
+      - '^refactor:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: 'Documentation'
+      regexp: '^.*?docs?(\(.+\))??!?:.+$'
+      order: 2
+    - title: 'Other Changes'
+      order: 999
+
+release:
+  github:
+    owner: yourusername  # Replace with your GitHub username
+    name: ops0
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## ops0 {{ .Tag }} Release
+    
+    Natural Language DevOps CLI - Making DevOps commands human-friendly!
+    
+    ### Installation
+    
+    **Quick Install:**
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/yourusername/ops0/main/install.sh | bash
+    ```
+    
+    **Go Users:**
+    ```bash
+    go install github.com/yourusername/ops0@{{ .Tag }}
+    ```
+    
+    **Manual Download:**
+    Download the appropriate binary for your platform below.
+    
+  footer: |
+    **Full Changelog**: https://github.com/yourusername/ops0/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    **Support**: If you encounter any issues, please [create an issue](https://github.com/yourusername/ops0/issues/new).
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+# Optional: Generate Software Bill of Materials
+sboms:
+  - artifacts: archive
+    documents:
+      - "{{ .ProjectName }}_{{ .Version }}_sbom.spdx.json"
+
+# Optional: Sign releases (requires setup)
+# signs:
+#   - artifacts: checksum
+#     args: ["--batch", "--local-user", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]

@@ -8,6 +8,14 @@ import (
 	"runtime"
 	"strings"
 	"regexp"
+	"flag"
+)
+
+// Version information (set by GoReleaser)
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 type Tool struct {
@@ -25,9 +33,31 @@ type CommandSuggestion struct {
 }
 
 func main() {
+	// Handle version flag
+	var showVersion bool
+	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("ops0 version %s\n", version)
+		fmt.Printf("commit: %s\n", commit)
+		fmt.Printf("built: %s\n", date)
+		fmt.Printf("go version: %s\n", runtime.Version())
+		fmt.Printf("platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
+		return
+	}
+
+	// Handle message flag
+	args := flag.Args()
 	if len(os.Args) < 3 || os.Args[1] != "-m" {
+		fmt.Println("ops0 - Natural Language DevOps CLI")
+		fmt.Printf("Version: %s\n\n", version)
 		fmt.Println("Usage: ops0 -m \"your natural language command\"")
-		fmt.Println("Example: ops0 -m \"i want to plan my iac code\"")
+		fmt.Println("       ops0 --version")
+		fmt.Println("\nExamples:")
+		fmt.Println("  ops0 -m \"i want to plan my iac code\"")
+		fmt.Println("  ops0 -m \"deploy my infrastructure\"")
+		fmt.Println("  ops0 -m \"run my ansible playbook\"")
 		os.Exit(1)
 	}
 
