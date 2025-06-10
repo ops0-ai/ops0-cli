@@ -48,7 +48,6 @@ func main() {
 	}
 
 	// Handle message flag
-	args := flag.Args()
 	if len(os.Args) < 3 || os.Args[1] != "-m" {
 		fmt.Println("ops0 - Natural Language DevOps CLI")
 		fmt.Printf("Version: %s\n\n", version)
