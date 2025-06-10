@@ -11,12 +11,59 @@ import (
 	"flag"
 )
 
-// Version information (set by GoReleaser)
+// Version information (set by GoReleaser or git)
 var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
+	version = "v0.1.0"  // Update this manually for each release
+	commit  = getCommit()
+	date    = getBuildDate()
 )
+
+// getVersion tries to get version from git tag, fallback to "dev"
+func getVersion() string {
+	if v := os.Getenv("VERSION"); v != "" {
+		return v
+	}
+	
+	// Try to get git tag
+	if cmd := exec.Command("git", "describe", "--tags", "--exact-match", "HEAD"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(output))
+		}
+	}
+	
+	// Try to get latest tag with commit info
+	if cmd := exec.Command("git", "describe", "--tags", "--always", "--dirty"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(output))
+		}
+	}
+	
+	return "dev"
+}
+
+// getCommit tries to get git commit hash
+func getCommit() string {
+	if c := os.Getenv("COMMIT"); c != "" {
+		return c
+	}
+	
+	if cmd := exec.Command("git", "rev-parse", "--short", "HEAD"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			return strings.TrimSpace(string(output))
+		}
+	}
+	
+	return "none"
+}
+
+// getBuildDate returns current build time
+func getBuildDate() string {
+	if d := os.Getenv("BUILD_DATE"); d != "" {
+		return d
+	}
+	
+	return "unknown"
+}
 
 type Tool struct {
 	Name        string
@@ -35,7 +82,10 @@ type CommandSuggestion struct {
 func main() {
 	// Handle version flag
 	var showVersion bool
+	var message string
+	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.StringVar(&message, "m", "", "natural language command message")
 	flag.Parse()
 
 	if showVersion {
@@ -47,12 +97,12 @@ func main() {
 		return
 	}
 
-	// Handle message flag
-	if len(os.Args) < 3 || os.Args[1] != "-m" {
+	// Check if message was provided
+	if message == "" {
 		fmt.Println("ops0 - Natural Language DevOps CLI")
 		fmt.Printf("Version: %s\n\n", version)
 		fmt.Println("Usage: ops0 -m \"your natural language command\"")
-		fmt.Println("       ops0 --version")
+		fmt.Println("       ops0 -version")
 		fmt.Println("\nExamples:")
 		fmt.Println("  ops0 -m \"i want to plan my iac code\"")
 		fmt.Println("  ops0 -m \"deploy my infrastructure\"")
@@ -60,11 +110,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	userInput := os.Args[2]
-	fmt.Printf("🤖 ops0: Analyzing your request: \"%s\"\n\n", userInput)
+	fmt.Printf("🤖 ops0: Analyzing your request: \"%s\"\n\n", message)
 
 	// Parse the natural language input
-	suggestion := parseIntent(userInput)
+	suggestion := parseIntent(message)
 	
 	if suggestion == nil {
 		fmt.Println("❌ ops0: I couldn't understand your request. Try being more specific about what you want to do.")
