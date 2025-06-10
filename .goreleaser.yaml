@@ -1,5 +1,5 @@
 # .goreleaser.yaml
-version: 2
+version: 1
 
 project_name: ops0
 
@@ -76,13 +76,13 @@ changelog:
       - Merge branch
   groups:
     - title: 'New Features'
-      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      regexp: '^.*?feat(\(.+\))??!?:.+
       order: 0
     - title: 'Bug Fixes'
-      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      regexp: '^.*?fix(\(.+\))??!?:.+
       order: 1
     - title: 'Documentation'
-      regexp: '^.*?docs?(\(.+\))??!?:.+$'
+      regexp: '^.*?docs?(\(.+\))??!?:.+
       order: 2
     - title: 'Other Changes'
       order: 999
