@@ -7,7 +7,7 @@ Thank you for considering contributing to ops0! We welcome contributions from th
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/ops0-ai/ops0-cli.git
+   git clone https://github.com/your-username/ops0-cli.git
    cd ops0-cli
    ```
 3. **Create a feature branch**:
