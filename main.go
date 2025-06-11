@@ -549,10 +549,16 @@ func getToolVersion(tool string) string {
 }
 
 func handleInteraction(suggestion *CommandSuggestion) {
+	// Normalize tool name for installation
+	toolName := suggestion.Tool
+	if toolName == "aws-cli" {
+		toolName = "aws"
+	}
+	
 	tool := &Tool{
-		Name:       suggestion.Tool,
-		CheckCmd:   suggestion.Tool + " --version",
-		InstallCmd: getInstallCommand(suggestion.Tool),
+		Name:       toolName,
+		CheckCmd:   toolName + " --version",
+		InstallCmd: getInstallCommand(toolName),
 	}
 	
 	tool.IsInstalled = checkToolInstalled(tool)
@@ -575,23 +581,39 @@ func handleInteraction(suggestion *CommandSuggestion) {
 	}
 
 	if !tool.IsInstalled {
-		fmt.Printf("⚠️  ops0: %s is not installed on your system.\n", strings.Title(tool.Name))
+		toolDisplayName := getToolDisplayName(suggestion.Tool)
+		fmt.Printf("⚠️  ops0: %s is not installed on your system.\n", toolDisplayName)
 		fmt.Print("Would you like me to install it? (y/n): ")
 		
 		if getUserConfirmation() {
 			if installTool(tool) {
-				fmt.Printf("✅ ops0: %s installed successfully!\n", strings.Title(tool.Name))
+				fmt.Printf("✅ ops0: %s installed successfully!\n", toolDisplayName)
 			} else {
-				fmt.Printf("❌ ops0: Failed to install %s. Please install it manually.\n", strings.Title(tool.Name))
+				fmt.Printf("❌ ops0: Failed to install %s. Please install it manually.\n", toolDisplayName)
 				return
 			}
 		} else {
-			fmt.Printf("❌ ops0: Cannot proceed without %s. Please install it and try again.\n", strings.Title(tool.Name))
+			fmt.Printf("❌ ops0: Cannot proceed without %s. Please install it and try again.\n", toolDisplayName)
 			return
 		}
 	}
 
 	executeCommand(suggestion)
+}
+
+func getToolDisplayName(toolName string) string {
+	switch toolName {
+	case "aws", "aws-cli":
+		return "AWS CLI"
+	case "gcloud":
+		return "Google Cloud SDK"
+	case "az":
+		return "Azure CLI"
+	case "kubectl":
+		return "Kubernetes CLI"
+	default:
+		return strings.Title(toolName)
+	}
 }
 
 func getCommit() string {
@@ -622,27 +644,69 @@ func checkToolInstalled(tool *Tool) bool {
 }
 
 func getInstallCommand(toolName string) string {
-	if runtime.GOOS != "darwin" {
-		return ""
-	}
-	
 	switch toolName {
 	case "terraform":
-		return "brew install terraform"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install terraform"
+			}
+			return "brew install terraform"
+		}
+		return "curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add - && sudo apt-add-repository \"deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main\" && sudo apt-get update && sudo apt-get install terraform"
 	case "ansible":
-		return "brew install ansible"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install ansible"
+			}
+			return "brew install ansible"
+		}
+		return "sudo apt-get update && sudo apt-get install ansible"
 	case "kubectl":
-		return "brew install kubectl"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install kubectl"
+			}
+			return "brew install kubectl"
+		}
+		return "curl -LO \"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl"
 	case "docker":
-		return "brew install docker"
+		if runtime.GOOS == "darwin" {
+			return "echo 'Please install Docker Desktop from https://www.docker.com/products/docker-desktop/' && open 'https://www.docker.com/products/docker-desktop/'"
+		}
+		return "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"
 	case "helm":
-		return "brew install helm"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install helm"
+			}
+			return "brew install helm"
+		}
+		return "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
 	case "aws":
-		return "brew install awscli"
+		if runtime.GOOS == "darwin" {
+			// Use direct installer for macOS to avoid Homebrew architecture issues
+			if runtime.GOARCH == "arm64" {
+				return "curl \"https://awscli.amazonaws.com/AWSCLIV2-arm64.pkg\" -o \"AWSCLIV2.pkg\" && sudo installer -pkg AWSCLIV2.pkg -target /"
+			}
+			return "curl \"https://awscli.amazonaws.com/AWSCLIV2.pkg\" -o \"AWSCLIV2.pkg\" && sudo installer -pkg AWSCLIV2.pkg -target /"
+		}
+		return "curl \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\" && unzip awscliv2.zip && sudo ./aws/install"
 	case "gcloud":
-		return "brew install google-cloud-sdk"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install google-cloud-sdk"
+			}
+			return "brew install google-cloud-sdk"
+		}
+		return "curl https://sdk.cloud.google.com | bash && exec -l $SHELL"
 	case "az":
-		return "brew install azure-cli"
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install azure-cli"
+			}
+			return "brew install azure-cli"
+		}
+		return "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash"
 	default:
 		return ""
 	}
@@ -651,6 +715,7 @@ func getInstallCommand(toolName string) string {
 func installTool(tool *Tool) bool {
 	if tool.InstallCmd == "" {
 		fmt.Printf("❌ ops0: Don't know how to install %s on this system.\n", tool.Name)
+		fmt.Printf("🔍 Debug: Tool name = '%s', OS = %s\n", tool.Name, runtime.GOOS)
 		return false
 	}
 	
