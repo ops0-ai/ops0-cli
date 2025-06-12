@@ -1,8 +1,14 @@
 <p align="center">
   <img src="assets/logo.jpg" alt="ops0 CLI Logo" width="150">
 </p>
+
 <p align="center">
-[ReadMe in Chinese](./README.zh-CN.md) • ReadMe in German • [ReadMe in French](./README.fr.md) • [ReadMe in Spanish](./README.es.md) • [ReadMe in Portuguese](./README.pt-BR.md) • [Slack Community](https://join.slack.com/t/ops0/shared_invite/zt-37akwqb1v-BvfK7AioDlRhje94UN2tkw)
+  <a href="./README.zh-CN.md">ReadMe in Chinese</a> • 
+  ReadMe in German • 
+  <a href="./README.fr.md">ReadMe in French</a> • 
+  <a href="./README.es.md">ReadMe in Spanish</a> • 
+  <a href="./README.pt-BR.md">ReadMe in Portuguese</a> • 
+  <a href="https://join.slack.com/t/ops0/shared_invite/zt-37akwqb1v-BvfK7AioDlRhje94UN2tkw">Slack Community</a>
 </p>
 ---
 
