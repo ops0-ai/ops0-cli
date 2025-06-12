@@ -2,6 +2,26 @@
 
 A smart CLI tool that translates natural language into DevOps commands, now powered by Claude AI for intelligent command generation and troubleshooting.
 
+## 🚀 Quick Start
+
+### Installation
+```bash
+curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
+```
+
+### Basic Usage
+```bash
+# Rule-based mode (works without API key)
+ops0 -m "i want to plan my iac code"
+
+# AI-powered mode (requires API key)
+export ANTHROPIC_API_KEY=your_key_here
+ops0 -m "check if my kubernetes pods are running" -ai
+
+# Troubleshooting mode
+ops0 -m "my terraform apply is failing with state lock" -troubleshoot
+```
+
 ## 📸 Command Examples in Action
 
 Here are some real-world examples of ops0 in action across different tools:
@@ -32,26 +52,6 @@ Each example demonstrates:
 - Clear command preview
 - Safe execution with confirmation
 - Detailed output formatting
-
-## 🚀 Quick Start
-
-### Installation
-```bash
-curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
-```
-
-### Basic Usage
-```bash
-# Rule-based mode (works without API key)
-ops0 -m "i want to plan my iac code"
-
-# AI-powered mode (requires API key)
-export ANTHROPIC_API_KEY=your_key_here
-ops0 -m "check if my kubernetes pods are running" -ai
-
-# Troubleshooting mode
-ops0 -m "my terraform apply is failing with state lock" -troubleshoot
-```
 
 ## 🛠️ Supported Tools & Features
 
