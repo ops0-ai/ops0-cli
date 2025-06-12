@@ -16,6 +16,17 @@ import (
 	"time"
 )
 
+// ANSI escape codes for text formatting
+const (
+	bold      = "\033[1m"
+	reset     = "\033[0m"
+	blue      = "\033[34m"
+	green     = "\033[32m"
+	yellow    = "\033[33m"
+	red       = "\033[31m"
+	underline = "\033[4m"
+)
+
 // Version information (set by GoReleaser or git)
 var (
 	version = "v0.1.0"
@@ -65,24 +76,33 @@ type Tool struct {
 type CommandSuggestion struct {
 	Tool        string
 	Command     string
+	DryRunCommand string  // Command to use for dry run
 	Description string
 	Intent      string
 	Confidence  float64
 	AIGenerated bool
+	HasDryRun   bool     // Whether this command supports dry run
 }
 
 func main() {
 	// Handle flags
 	var showVersion bool
+	var displayHelp bool
 	var message string
 	var aiMode bool
 	var troubleshoot bool
 	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
+	flag.BoolVar(&displayHelp, "help", false, "show help information")
 	flag.StringVar(&message, "m", "", "natural language command message")
 	flag.BoolVar(&aiMode, "ai", false, "use AI mode for advanced command generation")
 	flag.BoolVar(&troubleshoot, "troubleshoot", false, "troubleshooting mode with context analysis")
 	flag.Parse()
+
+	if displayHelp {
+		showHelp()
+		return
+	}
 
 	if showVersion {
 		fmt.Printf("ops0 version %s\n", version)
@@ -95,6 +115,8 @@ func main() {
 
 	// Check if message was provided
 	if message == "" {
+		fmt.Println("❌ ops0: No command message provided.")
+		fmt.Println("💡 Use -m flag to specify a command, or -help for usage information.")
 		showHelp()
 		os.Exit(1)
 	}
@@ -151,15 +173,105 @@ func main() {
 func showHelp() {
 	fmt.Println("ops0 - AI-Powered Natural Language DevOps CLI")
 	fmt.Printf("Version: %s\n\n", version)
-	fmt.Println("Usage:")
+
+	// Basic Usage
+	fmt.Println("📋 Usage:")
 	fmt.Println("  ops0 -m \"your natural language command\"")
 	fmt.Println("  ops0 -m \"command\" -ai")
 	fmt.Println("  ops0 -m \"error description\" -troubleshoot")
 	fmt.Println("  ops0 -version")
-	fmt.Println("\nExamples:")
-	fmt.Println("  ops0 -m \"i want to plan my iac code\"")
-	fmt.Println("  ops0 -m \"show running containers\"")
-	fmt.Println("  ops0 -m \"check if my pods are running\" -ai")
+	fmt.Println("  ops0 -help")
+
+	// Flags
+	fmt.Println("\n🚩 Flags:")
+	fmt.Println("  -m           Natural language command message (required)")
+	fmt.Println("  -ai          Enable AI mode for advanced command generation")
+	fmt.Println("  -troubleshoot Enable troubleshooting mode with context analysis")
+	fmt.Println("  -version     Show version information")
+	fmt.Println("  -help        Show this help message")
+
+	// Supported Tools
+	fmt.Println("\n🛠️  Supported Tools:")
+	
+	// Terraform
+	fmt.Println("\n  Terraform (Infrastructure as Code):")
+	fmt.Println("    • terraform plan     - Show infrastructure changes")
+	fmt.Println("    • terraform apply    - Apply infrastructure changes")
+	fmt.Println("    • terraform destroy  - Destroy infrastructure")
+	fmt.Println("    Examples:")
+	fmt.Println("      ops0 -m \"plan my infrastructure changes\"")
+	fmt.Println("      ops0 -m \"apply terraform configuration\"")
+
+	// Ansible
+	fmt.Println("\n  Ansible (Configuration Management):")
+	fmt.Println("    • ansible-playbook   - Run Ansible playbooks")
+	fmt.Println("    • ansible-playbook --check - Dry run playbooks")
+	fmt.Println("    Examples:")
+	fmt.Println("      ops0 -m \"run my ansible playbook\"")
+	fmt.Println("      ops0 -m \"check ansible changes\"")
+
+	// Kubernetes
+	fmt.Println("\n  Kubernetes (Container Orchestration):")
+	fmt.Println("    • kubectl get pods   - List pods")
+	fmt.Println("    • kubectl apply      - Apply manifests")
+	fmt.Println("    • kubectl delete     - Delete resources")
+	fmt.Println("    • kubectl logs       - View pod logs")
+	fmt.Println("    Examples:")
+	fmt.Println("      ops0 -m \"show me my pods\"")
+	fmt.Println("      ops0 -m \"deploy to kubernetes\"")
+
+	// Docker
+	fmt.Println("\n  Docker (Containerization):")
+	fmt.Println("    • docker ps          - List containers")
+	fmt.Println("    • docker build       - Build images")
+	fmt.Println("    • docker images      - List images")
+	fmt.Println("    Examples:")
+	fmt.Println("      ops0 -m \"show running containers\"")
+	fmt.Println("      ops0 -m \"build docker image\"")
+
+	// AWS CLI
+	fmt.Println("\n  AWS CLI (Amazon Web Services):")
+	fmt.Println("    • aws ec2            - EC2 operations")
+	fmt.Println("    • aws s3             - S3 operations")
+	fmt.Println("    Examples:")
+	fmt.Println("      ops0 -m \"list ec2 instances\"")
+	fmt.Println("      ops0 -m \"show s3 buckets\"")
+
+	// AI Mode
+	fmt.Println("\n🧠 AI Mode:")
+	fmt.Println("  Enable AI mode for advanced features:")
+	fmt.Println("  1. Get API key from console.anthropic.com")
+	fmt.Println("  2. Export key: export ANTHROPIC_API_KEY=your_key_here")
+	fmt.Println("  3. Use -ai flag: ops0 -m \"your command\" -ai")
+	fmt.Println("\n  AI mode benefits:")
+	fmt.Println("    • Better natural language understanding")
+	fmt.Println("    • Context-aware suggestions")
+	fmt.Println("    • Advanced troubleshooting")
+	fmt.Println("    • Support for complex scenarios")
+
+	// Dry Run Support
+	fmt.Println("\n🔍 Dry Run Support:")
+	fmt.Println("  Available for these operations:")
+	fmt.Println("    • Terraform: plan before apply/destroy")
+	fmt.Println("    • Ansible: --check flag")
+	fmt.Println("    • Kubernetes: --dry-run=client flag")
+	fmt.Println("  Will be offered automatically when available")
+
+	// Examples
+	fmt.Println("\n💡 More Examples:")
+	fmt.Println("  Infrastructure:")
+	fmt.Println("    ops0 -m \"plan my terraform changes\"")
+	fmt.Println("    ops0 -m \"apply infrastructure with approval\"")
+	fmt.Println("\n  Kubernetes:")
+	fmt.Println("    ops0 -m \"show pods in namespace monitoring\"")
+	fmt.Println("    ops0 -m \"deploy app to production namespace\"")
+	fmt.Println("\n  Troubleshooting:")
+	fmt.Println("    ops0 -m \"why are my pods crashing\" -troubleshoot")
+	fmt.Println("    ops0 -m \"check why terraform is failing\" -troubleshoot")
+
+	fmt.Println("\n📚 Documentation:")
+	fmt.Println("  Full documentation: https://github.com/ops0-ai/ops0-cli")
+	fmt.Println("  Report issues: https://github.com/ops0-ai/ops0-cli/issues")
 }
 
 func parseIntent(input string) *CommandSuggestion {
@@ -170,10 +282,12 @@ func parseIntent(input string) *CommandSuggestion {
 		return &CommandSuggestion{
 			Tool:        "terraform",
 			Command:     "terraform plan",
+			DryRunCommand: "", // Plan is already a dry run
 			Description: "This will show you what changes Terraform will make to your infrastructure without actually applying them.",
 			Intent:      "plan infrastructure changes",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 	
@@ -181,10 +295,12 @@ func parseIntent(input string) *CommandSuggestion {
 		return &CommandSuggestion{
 			Tool:        "terraform",
 			Command:     "terraform apply",
+			DryRunCommand: "terraform plan",
 			Description: "This will apply your Terraform configuration and make the actual infrastructure changes.",
 			Intent:      "apply infrastructure changes",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   true,
 		}
 	}
 	
@@ -192,10 +308,12 @@ func parseIntent(input string) *CommandSuggestion {
 		return &CommandSuggestion{
 			Tool:        "terraform",
 			Command:     "terraform destroy",
+			DryRunCommand: "terraform plan -destroy",
 			Description: "This will destroy all resources managed by your Terraform configuration.",
 			Intent:      "destroy infrastructure",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   true,
 		}
 	}
 
@@ -204,10 +322,12 @@ func parseIntent(input string) *CommandSuggestion {
 		return &CommandSuggestion{
 			Tool:        "ansible",
 			Command:     "ansible-playbook playbook.yml",
+			DryRunCommand: "ansible-playbook playbook.yml --check",
 			Description: "This will run your Ansible playbook to configure your servers.",
 			Intent:      "run ansible playbook",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   true,
 		}
 	}
 	
@@ -219,6 +339,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "check ansible playbook",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 
@@ -238,6 +359,7 @@ func parseIntent(input string) *CommandSuggestion {
 						Intent:      "check pod status in specific namespace",
 						Confidence:  0.9,
 						AIGenerated: false,
+						HasDryRun:   false,
 					}
 				}
 			}
@@ -249,45 +371,33 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "check pod status",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 	
-	if matched, _ := regexp.MatchString(`(get|list|show).*services?|services?.*status`, input); matched {
-		// Check if namespace is specified
-		if strings.Contains(input, "namespace") {
-			words := strings.Fields(input)
-			for i, word := range words {
-				if word == "namespace" && i+1 < len(words) {
-					namespace := words[i+1]
-					return &CommandSuggestion{
-						Tool:        "kubectl",
-						Command:     "kubectl get services -n " + namespace,
-						Description: "This will show all services in the " + namespace + " namespace.",
-						Intent:      "check service status in specific namespace",
-						Confidence:  0.9,
-						AIGenerated: false,
-					}
-				}
-			}
-		}
+	if matched, _ := regexp.MatchString(`apply.*kubernetes|deploy.*k8s|kubectl.*apply`, input); matched {
 		return &CommandSuggestion{
 			Tool:        "kubectl",
-			Command:     "kubectl get services",
-			Description: "This will show all services in the current namespace.",
-			Intent:      "check service status",
+			Command:     "kubectl apply -f .",
+			DryRunCommand: "kubectl apply -f . --dry-run=client",
+			Description: "This will apply Kubernetes manifests in the current directory.",
+			Intent:      "apply kubernetes manifests",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   true,
 		}
 	}
 	
-	if matched, _ := regexp.MatchString(`logs?|check.*logs?|pod.*logs?`, input); matched {
+	if matched, _ := regexp.MatchString(`delete.*kubernetes|remove.*k8s|kubectl.*delete`, input); matched {
 		return &CommandSuggestion{
 			Tool:        "kubectl",
-			Command:     "kubectl logs -l app=<app-name>",
-			Description: "This will show logs from pods. Replace <app-name> with your app label.",
-			Intent:      "view pod logs",
-			Confidence:  0.7,
+			Command:     "kubectl delete -f .",
+			DryRunCommand: "kubectl delete -f . --dry-run=client",
+			Description: "This will delete resources defined in Kubernetes manifests in the current directory.",
+			Intent:      "delete kubernetes resources",
+			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   true,
 		}
 	}
 
@@ -300,6 +410,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "list running containers",
 			Confidence:  0.9,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 	
@@ -311,6 +422,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "build docker image",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 	
@@ -322,6 +434,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "list docker images",
 			Confidence:  0.9,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 
@@ -334,6 +447,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "list EC2 instances",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 	
@@ -345,6 +459,7 @@ func parseIntent(input string) *CommandSuggestion {
 			Intent:      "list S3 buckets",
 			Confidence:  0.8,
 			AIGenerated: false,
+			HasDryRun:   false,
 		}
 	}
 
@@ -360,9 +475,11 @@ Respond with a JSON object in this exact format:
 {
   "tool": "terraform",
   "command": "terraform plan",
+  "dry_run_command": "terraform plan",
   "description": "This will show you what changes Terraform will make",
   "intent": "plan infrastructure changes",
-  "confidence": 0.95
+  "confidence": 0.95,
+  "has_dry_run": true
 }
 
 Rules:
@@ -370,6 +487,11 @@ Rules:
 - Prefer safe, read-only commands when possible
 - Include helpful descriptions
 - Set confidence between 0-1 based on how certain you are
+- For commands that modify state, provide a dry run command if available:
+  * terraform: use "terraform plan" for apply/destroy
+  * ansible: use "--check" flag
+  * kubectl: use "--dry-run=client" flag
+  * For read-only commands, set has_dry_run to false
 - If you can't understand the request, return null`
 
 	response := callClaude(config, systemPrompt, userInput)
@@ -548,6 +670,26 @@ func getToolVersion(tool string) string {
 	return ""
 }
 
+func formatSection(title string, content []string) string {
+	var output strings.Builder
+	
+	// Title with underline
+	output.WriteString("\n" + blue + bold + title + reset + "\n")
+	output.WriteString(blue + strings.Repeat("─", len(title)) + reset + "\n")
+	
+	// Content with bold keys
+	for _, line := range content {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) == 2 {
+			output.WriteString(bold + parts[0] + ":" + reset + parts[1] + "\n")
+		} else {
+			output.WriteString(line + "\n")
+		}
+	}
+	
+	return output.String()
+}
+
 func handleInteraction(suggestion *CommandSuggestion) {
 	// Normalize tool name for installation
 	toolName := suggestion.Tool
@@ -563,42 +705,110 @@ func handleInteraction(suggestion *CommandSuggestion) {
 	
 	tool.IsInstalled = checkToolInstalled(tool)
 	
-	aiIndicator := ""
-	if suggestion.AIGenerated {
-		aiIndicator = "🧠 "
-		fmt.Printf("💡 %sops0: I can help you %s via `%s`. %s (Confidence: %.0f%%)\n", 
-			aiIndicator, suggestion.Intent, suggestion.Command, suggestion.Description, suggestion.Confidence*100)
-	} else {
-		fmt.Printf("💡 ops0: I can help you %s via `%s`. %s\n", 
-			suggestion.Intent, suggestion.Command, suggestion.Description)
+	// Prepare command details for display
+	var details []string
+	details = append(details, "Tool: "+getToolDisplayName(suggestion.Tool))
+	details = append(details, "Intent: "+suggestion.Intent)
+	details = append(details, "Command: "+suggestion.Command)
+	if suggestion.HasDryRun {
+		details = append(details, "Dry Run: "+suggestion.DryRunCommand)
 	}
-	
-	fmt.Print("Would you like me to do this? (y/n): ")
-	
-	if !getUserConfirmation() {
-		fmt.Println("👋 ops0: No problem! Let me know if you need help with anything else.")
-		return
+	details = append(details, "Description: "+suggestion.Description)
+	if suggestion.AIGenerated {
+		details = append(details, fmt.Sprintf("AI Confidence: %.0f%%", suggestion.Confidence*100))
 	}
 
+	// Display command details
+	if suggestion.AIGenerated {
+		fmt.Print(formatSection("🧠 AI-Generated Command", details))
+	} else {
+		fmt.Print(formatSection("💡 Command Details", details))
+	}
+
+	// Check if tool is installed
 	if !tool.IsInstalled {
 		toolDisplayName := getToolDisplayName(suggestion.Tool)
-		fmt.Printf("⚠️  ops0: %s is not installed on your system.\n", toolDisplayName)
-		fmt.Print("Would you like me to install it? (y/n): ")
+		fmt.Printf("\n" + yellow + bold + "⚠️  Installation Required" + reset + "\n")
+		fmt.Printf("%s is not installed on your system.\n", toolDisplayName)
+		fmt.Print("Would you like to install it? (y/n): ")
 		
 		if getUserConfirmation() {
 			if installTool(tool) {
-				fmt.Printf("✅ ops0: %s installed successfully!\n", toolDisplayName)
+				fmt.Printf("\n" + green + "✅ %s installed successfully!" + reset + "\n", toolDisplayName)
 			} else {
-				fmt.Printf("❌ ops0: Failed to install %s. Please install it manually.\n", toolDisplayName)
+				fmt.Printf("\n" + red + "❌ Failed to install %s. Please install it manually." + reset + "\n", toolDisplayName)
 				return
 			}
 		} else {
-			fmt.Printf("❌ ops0: Cannot proceed without %s. Please install it and try again.\n", toolDisplayName)
+			fmt.Printf("\n" + red + "❌ Cannot proceed without %s. Please install it and try again." + reset + "\n", toolDisplayName)
+			return
+		}
+	}
+
+	// Handle dry run option
+	if suggestion.HasDryRun {
+		fmt.Print("\n" + bold + "🔍 Dry Run Available" + reset + "\n")
+		fmt.Print("Would you like to perform a dry run first? (y/n): ")
+		if getUserConfirmation() {
+			fmt.Printf("\n" + bold + "🔍 Performing dry run..." + reset + "\n")
+			executeDryRun(suggestion)
+			fmt.Print("\nWould you like to proceed with the actual command? (y/n): ")
+			if !getUserConfirmation() {
+				fmt.Print("\n👋 No problem! Let me know if you need help with anything else.\n")
+				return
+			}
+		}
+	} else {
+		fmt.Print("\nWould you like to execute this command? (y/n): ")
+		if !getUserConfirmation() {
+			fmt.Print("\n👋 No problem! Let me know if you need help with anything else.\n")
 			return
 		}
 	}
 
 	executeCommand(suggestion)
+}
+
+func executeCommand(suggestion *CommandSuggestion) {
+	fmt.Printf("\n" + bold + "🚀 Executing: " + reset + "%s\n\n", suggestion.Command)
+	
+	command := suggestion.Command
+	if suggestion.Tool == "ansible" && strings.Contains(command, "playbook.yml") {
+		if playbookFile := findPlaybookFile(); playbookFile != "" {
+			command = strings.Replace(command, "playbook.yml", playbookFile, 1)
+			fmt.Printf(bold + "📝 Found playbook: " + reset + "%s\n", playbookFile)
+		}
+	}
+	
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("\n" + red + "❌ Command failed with error: %v" + reset + "\n", err)
+	} else {
+		fmt.Printf("\n" + green + "✅ Command completed successfully!" + reset + "\n")
+	}
+}
+
+func executeDryRun(suggestion *CommandSuggestion) {
+	if suggestion.DryRunCommand == "" {
+		return
+	}
+
+	fmt.Printf(bold + "🔍 Executing dry run: " + reset + "%s\n\n", suggestion.DryRunCommand)
+	
+	cmd := exec.Command("sh", "-c", suggestion.DryRunCommand)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("\n" + yellow + "⚠️  Dry run completed with warnings/errors: %v" + reset + "\n", err)
+	} else {
+		fmt.Printf("\n" + green + "✅ Dry run completed successfully!" + reset + "\n")
+	}
 }
 
 func getToolDisplayName(toolName string) string {
@@ -725,29 +935,6 @@ func installTool(tool *Tool) bool {
 	cmd.Stderr = os.Stderr
 	
 	return cmd.Run() == nil
-}
-
-func executeCommand(suggestion *CommandSuggestion) {
-	fmt.Printf("🚀 ops0: Executing: %s\n\n", suggestion.Command)
-	
-	command := suggestion.Command
-	if suggestion.Tool == "ansible" && strings.Contains(command, "playbook.yml") {
-		if playbookFile := findPlaybookFile(); playbookFile != "" {
-			command = strings.Replace(command, "playbook.yml", playbookFile, 1)
-			fmt.Printf("📝 ops0: Found playbook: %s\n", playbookFile)
-		}
-	}
-	
-	cmd := exec.Command("sh", "-c", command)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("\n❌ ops0: Command failed with error: %v\n", err)
-	} else {
-		fmt.Printf("\n✅ ops0: Command completed successfully!\n")
-	}
 }
 
 func findPlaybookFile() string {
