@@ -1,6 +1,5 @@
 <p align="center">
   <img src="assets/logo.jpg" alt="ops0 CLI Logo" width="150">
-  <h1 align="center"><b>ops0</b></h1>
 </p>
 
 ---
