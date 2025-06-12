@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="ops0 CLI Logo">
+  <img src="assets/logo.png" alt="ops0 CLI Logo">
 </p>
 
 ---
@@ -8,7 +8,7 @@ ops0 is an intelligent CLI tool that transforms natural language into DevOps com
 
 ## 🎥 ops0 in Action
 
-![ops0 CLI Demo](ops0cli.gif)
+![ops0 CLI Demo](assets/ops0cli.gif)
 *Watch ops0 translate natural language into powerful DevOps commands*
 
 ## 🚀 Quick Start
