@@ -1,10 +1,15 @@
 <p align="center">
   <img src="assets/logo.jpg" alt="ops0 CLI Logo" width="150">
+  <h1 align="center"><b>ops0</b></h1>
 </p>
 
 ---
 
-ops0 is an intelligent CLI tool that transforms natural language into DevOps commands. Powered by Claude AI, it simplifies complex DevOps tasks by understanding your intent and generating the right commands, making DevOps management more accessible and efficient.
+<p align="center">
+ops0 is an intelligent CLI tool that transforms natural language into DevOps commands.<br>
+Powered by Claude AI, it simplifies complex DevOps tasks by understanding your intent<br>
+and generating the right commands, making DevOps management more accessible and efficient.
+</p>
 
 ## 🎥 ops0 in Action
 
