@@ -1,6 +1,15 @@
-# ops0 - AI-Powered Natural Language DevOps CLI
+<p align="center">
+  <img src="logo.png" alt="ops0 CLI Logo">
+</p>
 
-A smart CLI tool that translates natural language into DevOps commands, now powered by Claude AI for intelligent command generation and troubleshooting.
+---
+
+ops0 is an intelligent CLI tool that transforms natural language into DevOps commands. Powered by Claude AI, it simplifies complex DevOps tasks by understanding your intent and generating the right commands, making infrastructure management more accessible and efficient.
+
+## 🎥 ops0 in Action
+
+![ops0 CLI Demo](ops0cli.gif)
+*Watch ops0 translate natural language into powerful DevOps commands*
 
 ## 🚀 Quick Start
 
