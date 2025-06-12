@@ -10,12 +10,12 @@ Powered by Claude AI, it simplifies complex DevOps tasks by understanding your i
 and generating the right commands, making DevOps management more accessible and efficient.
 </p>
 
-## 🎥 ops0 in Action
+## ops0 in Action
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
 *Watch ops0 translate natural language into powerful DevOps commands*
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 ```bash
@@ -35,7 +35,7 @@ ops0 -m "check if my kubernetes pods are running" -ai
 ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 ```
 
-## 📸 Command Examples in Action
+## Command Examples in Action
 
 Here are some real-world examples of ops0 in action across different tools:
 
@@ -66,7 +66,7 @@ Each example demonstrates:
 - Safe execution with confirmation
 - Detailed output formatting
 
-## 🛠️ Supported Tools & Features
+## Supported Tools & Features
 
 ### Core Tools
 - **Terraform** - Infrastructure as Code
@@ -98,7 +98,7 @@ Each example demonstrates:
 | Complex Scenarios | Limited | Excellent |
 | Offline Usage | ✅ | ❌ |
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 ```bash
@@ -127,7 +127,7 @@ tools:
     install_cmd: brew install kubectl
 ```
 
-## 🛡️ Privacy & Security
+## Privacy & Security
 
 - **API Key**: Stored locally as environment variable
 - **No Data Storage**: Commands and context not stored by ops0
@@ -161,7 +161,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - [ ] Advanced context analysis
 - [ ] Team collaboration features
 
-## 💡 Tips
+## Tips
 
 1. **Be Specific**: "my terraform plan shows 5 resources changing" vs "terraform error"
 2. **Use Troubleshoot Mode**: For complex issues, use `-troubleshoot` flag
