@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="ops0 CLI Logo">
+  <img src="assets/logo.jpg" alt="ops0 CLI Logo">
 </p>
 
 ---
