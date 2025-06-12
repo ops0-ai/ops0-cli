@@ -2,14 +2,7 @@
   <img src="assets/logo.jpg" alt="ops0 CLI Logo" width="150">
 </p>
 
-<p align="center">
-  <a href="./README.md">English</a> •
-  <a href="./README.zh-CN.md">简体中文</a> •
-  <a href="./README.de.md">Deutsch</a> •
-  <a href="./README.fr.md">Français</a> •
-  <a href="./README.es.md">Español</a> •
-  <a href="./README.pt-BR.md">Português</a>
-</p>
+[ReadMe in Chinese](./README.zh-CN.md) • [ReadMe in German](./README.de.md) • [ReadMe in French](./README.fr.md) • [ReadMe in Spanish](./README.es.md) • ReadMe in Portuguese • [Slack Community](https://join.slack.com/t/ops0/shared_invite/zt-37akwqb1v-BvfK7AioDlRhje94UN2tkw)
 
 ---
 
