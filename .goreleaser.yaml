@@ -44,3 +44,10 @@ snapshot:
 
 changelog:
   sort: asc
+  groups:
+    - title: "🚀 Features"
+      regexp: '^feat(\(.+\))?:'
+    - title: "🐛 Bug Fixes"
+      regexp: '^fix(\(.+\))?:'
+    - title: "🧰 Maintenance"
+      regexp: '^chore(\(.+\))?:|^refactor(\(.+\))?:'
