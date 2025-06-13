@@ -102,9 +102,20 @@ ops0 -m "Systemprotokolle anzeigen"
 ops0 -m "Journalprotokolle prüfen"
 ```
 
+### Systemverwaltung & Log-Analyse Beispiele
+```bash
+# Kubernetes Pod-Logs analysieren und KI-Zusammenfassung mit Empfehlungen erhalten
+ops0 -m "analysiere logs für pod my-app-123 im namespace prod"
+
+# Eine bestimmte Logdatei auf Probleme analysieren
+ops0 -m "analysiere /var/log/nginx/error.log"
+```
+
 ### Hauptfunktionen
 - Übersetzung natürlicher Sprache
 - KI-gestützte Fehlerbehebung
+- **Kubernetes Pod-Log-Analyse mit KI-Zusammenfassung und Befehlsvorschlägen**
+- **Logdateipfad-Analyse für Probleme und Kontext**
 - Kontextbewusste Vorschläge
 - Sichere Ausführung mit Bestätigung
 - Dry-Run-Unterstützung für destruktive Operationen

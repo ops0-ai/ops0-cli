@@ -82,8 +82,14 @@ Aqui estão alguns exemplos reais do ops0 em ação com diferentes ferramentas:
 - **Azure CLI** - Microsoft Azure
 - **System Admin** - Administração de Sistemas Linux
 
-### Exemplos de Administração de Sistema
+### Exemplos de Administração de Sistema e Análise de Logs
 ```bash
+# Analisar logs de um pod Kubernetes e obter resumo IA com recomendações
+ops0 -m "analisar logs do pod my-app-123 no namespace prod"
+
+# Analisar um arquivo de log específico em busca de problemas
+ops0 -m "analisar /var/log/nginx/error.log"
+
 # Monitorar recursos do sistema
 ops0 -m "mostrar uso de memória na minha máquina"
 ops0 -m "verificar espaço em disco"
@@ -105,6 +111,8 @@ ops0 -m "verificar logs journalctl"
 ### Recursos Principais
 - Tradução de linguagem natural
 - Solução de problemas assistida por IA
+- **Análise de logs de pods Kubernetes com resumo IA e comandos sugeridos**
+- **Análise de arquivos de log para problemas e contexto**
 - Sugestões contextuais
 - Execução segura com confirmação
 - Suporte de simulação para operações destrutivas

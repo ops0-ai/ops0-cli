@@ -112,9 +112,20 @@ ops0 -m "show system logs"
 ops0 -m "check journal logs"
 ```
 
+### System Administration & Log Analysis Examples
+```bash
+# Analyze Kubernetes pod logs and get AI-powered summary and recommendations
+ops0 -m "analyze logs for pod my-app-123 in namespace prod"
+
+# Analyze a specific log file for issues
+ops0 -m "analyze /var/log/nginx/error.log"
+```
+
 ### Key Features
 - Natural language command translation
 - AI-powered troubleshooting
+- **Kubernetes pod log analysis with AI summary and suggested commands**
+- **Log file path analysis for issues and context**
 - Context-aware suggestions
 - Safe execution with confirmations
 - Dry run support for destructive operations
