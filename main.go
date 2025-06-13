@@ -327,6 +327,18 @@ func parseIntent(input string) *CommandSuggestion {
 	}
 
 	// Ansible patterns
+	if matched, _ := regexp.MatchString(`(setup|create|init|generate).*ansible.*project|ansible.*playbook.*inventory`, input); matched {
+		return &CommandSuggestion{
+			Tool:    "ansible_scaffold",
+			Command: input, // Pass the full user message for AI/template
+			Description: "Scaffold a new Ansible project (playbook + inventory) from your request.",
+			Intent:  "scaffold ansible project",
+			Confidence: 0.95,
+			AIGenerated: false,
+			HasDryRun: false,
+		}
+	}
+	
 	if matched, _ := regexp.MatchString(`run.*playbook|execute.*ansible|ansible.*playbook`, input); matched {
 		return &CommandSuggestion{
 			Tool:        "ansible",
@@ -775,6 +787,82 @@ func handleInteraction(suggestion *CommandSuggestion) {
 		}
 	}
 
+	if suggestion.Tool == "ansible_scaffold" {
+		var files map[string]string
+		var err error
+		intent := strings.ToLower(suggestion.Intent + " " + suggestion.Command)
+		projectName := extractProjectName(suggestion.Command)
+		if projectName == "" {
+			projectName = "ansible_project"
+		}
+		dir := projectName
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			files, err = parseAnsibleFilesFromAIDescription(suggestion.Description)
+			if err != nil || len(files) == 0 {
+				// fallback to previous AI parsing if needed
+				var playbookContent, inventoryContent, playbookFile, inventoryFile string
+				playbookContent, inventoryContent, playbookFile, inventoryFile, err = generateAnsibleProjectAIWithFilenames(suggestion.Command)
+				if err == nil {
+					files = map[string]string{
+						playbookFile: playbookContent,
+						inventoryFile: inventoryContent,
+					}
+				}
+			}
+		} else {
+			var playbookContent, inventoryContent string
+			playbookContent, inventoryContent, err = generateAnsibleProjectTemplate(suggestion.Command)
+			files = map[string]string{
+				"playbook.yml": playbookContent,
+				"inventory.yml": inventoryContent,
+			}
+		}
+		if err != nil || len(files) == 0 {
+			fmt.Printf("❌ Failed to generate Ansible project: %v\n", err)
+			return
+		}
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Printf("❌ Could not create project directory '%s': %v\n", dir, err)
+			return
+		}
+		fmt.Printf("✅ Ansible project directory '%s' created with:\n", dir)
+		for fname, content := range files {
+			fpath := dir + "/" + fname
+			if err := os.WriteFile(fpath, []byte(content), 0644); err != nil {
+				fmt.Printf("❌ Could not write %s: %v\n", fpath, err)
+				return
+			}
+			fmt.Printf("  - %s\n", fname)
+		}
+		// Only execute if the user intent is to run/execute, not create/setup/init/generate
+		if strings.Contains(intent, "run") || strings.Contains(intent, "execute") || strings.Contains(intent, "do ") {
+			playbookFile, inventoryFile := findAnsiblePlaybookAndInventory(files)
+			if playbookFile != "" && inventoryFile != "" {
+				fmt.Print("\nWould you like to execute the playbook now? (y/n): ")
+				if getUserConfirmation() {
+					cmd := exec.Command("ansible-playbook", "-i", inventoryFile, playbookFile)
+					cmd.Dir = dir
+					cmd.Stdout = os.Stdout
+					cmd.Stderr = os.Stderr
+					cmd.Stdin = os.Stdin
+					fmt.Printf("\n🚀 Executing: ansible-playbook -i %s %s in %s\n\n", inventoryFile, playbookFile, dir)
+					if err := cmd.Run(); err != nil {
+						fmt.Printf("\n❌ Command failed with error: %v\n", err)
+					} else {
+						fmt.Printf("\n✅ Playbook executed successfully!\n")
+					}
+				} else {
+					fmt.Println("\n👋 Project is ready. You can run the playbook later with:\n  cd", dir, "&& ansible-playbook -i", inventoryFile, playbookFile)
+				}
+			} else {
+				fmt.Println("\n⚠️  Could not determine playbook/inventory file for execution. Please check the generated files.")
+			}
+		} else {
+			fmt.Println("\n👋 Project is ready. You can run the playbook later with:\n  cd", dir, "&& ansible-playbook -i inventory.yml playbook.yml")
+		}
+		return
+	}
+
 	executeCommand(suggestion)
 }
 
@@ -1150,4 +1238,170 @@ func mapKeys(m map[string]struct{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func generateAnsibleProjectAIWithFilenames(userMsg string) (string, string, string, string, error) {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return "", "", "", "", fmt.Errorf("No ANTHROPIC_API_KEY set")
+	}
+	prompt := `You are an expert DevOps assistant. Given the following user request, generate:
+1. A complete Ansible playbook YAML (for playbook file)
+2. A valid Ansible inventory file (for inventory file)
+
+Respond in this format:
+---PLAYBOOK FILE---
+<playbook filename>
+---PLAYBOOK---
+<playbook yaml>
+---INVENTORY FILE---
+<inventory filename>
+---INVENTORY---
+<inventory content>
+
+User request: ` + userMsg
+	claudeConfig := &ClaudeConfig{
+		APIKey: apiKey,
+		Model:  "claude-3-5-sonnet-20241022",
+		MaxTokens: 1024,
+	}
+	response := callClaude(claudeConfig, prompt, "")
+	if response == "" {
+		return "", "", "", "", fmt.Errorf("AI did not return a response")
+	}
+	playbookContent, inventoryContent, playbookFile, inventoryFile := parseAnsibleAIResponseWithFilenames(response)
+	if playbookFile == "" {
+		playbookFile = "playbook.yml"
+	}
+	if inventoryFile == "" {
+		inventoryFile = "inventory.yml"
+	}
+	return playbookContent, inventoryContent, playbookFile, inventoryFile, nil
+}
+
+func parseAnsibleAIResponseWithFilenames(resp string) (string, string, string, string) {
+	playbook := ""
+	inventory := ""
+	playbookFile := ""
+	inventoryFile := ""
+	pfStart := strings.Index(resp, "---PLAYBOOK FILE---")
+	pStart := strings.Index(resp, "---PLAYBOOK---")
+	ifStart := strings.Index(resp, "---INVENTORY FILE---")
+	iStart := strings.Index(resp, "---INVENTORY---")
+	if pfStart != -1 && pStart != -1 {
+		playbookFile = strings.TrimSpace(resp[pfStart+len("---PLAYBOOK FILE---"):pStart])
+	}
+	if pStart != -1 && ifStart != -1 {
+		playbook = strings.TrimSpace(resp[pStart+len("---PLAYBOOK---"):ifStart])
+	}
+	if ifStart != -1 && iStart != -1 {
+		inventoryFile = strings.TrimSpace(resp[ifStart+len("---INVENTORY FILE---"):iStart])
+	}
+	if iStart != -1 {
+		inventory = strings.TrimSpace(resp[iStart+len("---INVENTORY---"):])
+	}
+	return playbook, inventory, playbookFile, inventoryFile
+}
+
+func generateAnsibleProjectTemplate(userMsg string) (string, string, error) {
+	// Simple fallback: extract project name, group, host (very basic)
+	project := "ansible-project"
+	group := "web"
+	host := "127.0.0.1"
+	if strings.Contains(userMsg, "nginx") {
+		group = "nginx"
+	}
+	if ip := extractIP(userMsg); ip != "" {
+		host = ip
+	}
+	playbook := fmt.Sprintf(`- name: %s
+  hosts: %s
+  become: yes
+  tasks:
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+      when: ansible_os_family == 'Debian'
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+    - name: Create symlink
+      file:
+        src: /some/source
+        dest: /some/dest
+        state: link
+`, project, group)
+	inventory := fmt.Sprintf(`[%s]
+%s
+`, group, host)
+	return playbook, inventory, nil
+}
+
+func extractIP(s string) string {
+	re := regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	match := re.FindString(s)
+	return match
+}
+
+func extractProjectName(msg string) string {
+	re := regexp.MustCompile(`(?i)project\s+([a-zA-Z0-9_-]+)`)
+	match := re.FindStringSubmatch(msg)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// Helper to parse AI description for file names and YAML blocks
+func parseAnsibleFilesFromAIDescription(desc string) (map[string]string, error) {
+	files := make(map[string]string)
+	lines := strings.Split(desc, "\n")
+	var currentFile string
+	var currentContent []string
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if strings.HasSuffix(line, "with:") && !strings.Contains(line, "Then ") {
+			if currentFile != "" && len(currentContent) > 0 {
+				files[currentFile] = strings.Join(currentContent, "\n")
+			}
+			currentFile = strings.TrimSuffix(line, " with:")
+			currentContent = []string{}
+			continue
+		}
+		if currentFile != "" {
+			if line == "AI Confidence: 85%" || strings.HasPrefix(line, "Would you like to execute") || strings.HasPrefix(line, "Command:") {
+				files[currentFile] = strings.Join(currentContent, "\n")
+				currentFile = ""
+				currentContent = []string{}
+				continue
+			}
+			currentContent = append(currentContent, lines[i])
+		}
+	}
+	if currentFile != "" && len(currentContent) > 0 {
+		files[currentFile] = strings.Join(currentContent, "\n")
+	}
+	return files, nil
+}
+
+func findAnsiblePlaybookAndInventory(files map[string]string) (string, string) {
+	playbookFile := ""
+	inventoryFile := ""
+	for fname := range files {
+		if strings.Contains(fname, "playbook") || strings.HasSuffix(fname, ".yml") && playbookFile == "" {
+			playbookFile = fname
+		}
+		if strings.Contains(fname, "inventory") || strings.HasPrefix(fname, "inv") {
+			inventoryFile = fname
+		}
+	}
+	if playbookFile == "" {
+		playbookFile = "playbook.yml"
+	}
+	if inventoryFile == "" {
+		inventoryFile = "inventory.yml"
+	}
+	return playbookFile, inventoryFile
 }
