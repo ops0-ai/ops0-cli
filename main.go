@@ -170,6 +170,20 @@ func main() {
 		}
 	}
 
+	// Post-process for log file analysis intent if needed
+	if suggestion != nil && strings.Contains(suggestion.Command, ".log") {
+		msgLower := strings.ToLower(message)
+		if strings.Contains(msgLower, "analyze") || strings.Contains(msgLower, "review") ||
+		   strings.Contains(msgLower, "check") || strings.Contains(msgLower, "summarize") || strings.Contains(msgLower, "inspect") {
+			suggestion.Intent = "analyze_logs"
+			// Use a safe preview command for analysis, not tail -f
+			re := regexp.MustCompile(`([^-\s]+\.log)`)
+			if m := re.FindStringSubmatch(suggestion.Command); len(m) > 1 {
+				suggestion.Command = "tail -n 100 " + m[1]
+			}
+		}
+	}
+
 	// Fallback to rule-based parsing if AI didn't work or isn't available
 	if suggestion == nil {
 		suggestion = parseIntent(message)
@@ -583,6 +597,21 @@ func parseIntent(input string) *CommandSuggestion {
 		}
 	}
 
+	// Log file analysis pattern
+	fileRe := regexp.MustCompile(`(?:analyze|review|check|summarize|inspect)[^\n]*?(/[^\s]+\.log)`) // non-greedy match for file path
+	if m := fileRe.FindStringSubmatch(input); len(m) > 1 {
+		filePath := m[1]
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     "tail -n 100 " + filePath,
+			Description: "Fetch and analyze the last 100 lines of log file: " + filePath,
+			Intent:      "analyze_logs",
+			Confidence:  0.95,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+
 	return nil
 }
 
@@ -812,6 +841,37 @@ func formatSection(title string, content []string) string {
 }
 
 func handleInteraction(suggestion *CommandSuggestion) {
+	// Handle log analysis intent for any tool
+	if suggestion.Intent == "analyze_logs" {
+		fmt.Println("\n--- Log Preview ---")
+		cmd := exec.Command("bash", "-c", suggestion.Command)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Error fetching logs: %v\n", err)
+		}
+		preview := string(output)
+		if len(preview) > 2000 {
+			preview = preview[len(preview)-2000:]
+		}
+		fmt.Println(preview)
+		fmt.Print("\nProceed with AI analysis of these logs? (y/n): ")
+		if !getUserConfirmation() {
+			fmt.Println("Log analysis cancelled.")
+			return
+		}
+		// AI or rule-based analysis
+		var analysis string
+		if claudeConfig := getClaudeConfigIfAvailable(); claudeConfig != nil {
+			prompt := `You are a DevOps assistant. Analyze the following logs for errors, warnings, or issues. If you find problems, explain them, suggest a fix, and provide a command to resolve if possible. If all looks fine, say so.\n\nLOGS:\n` + preview
+			analysis = callClaude(claudeConfig, "Log Analysis", prompt)
+		} else {
+			analysis = simpleLogAnalysis(preview)
+		}
+		fmt.Println("\n--- AI Log Analysis ---")
+		fmt.Println(analysis)
+		return
+	}
+
 	// Normalize tool name for installation
 	toolName := suggestion.Tool
 	if toolName == "aws-cli" {
@@ -996,36 +1056,6 @@ func handleInteraction(suggestion *CommandSuggestion) {
 	}
 
 	executeCommand(suggestion)
-
-	if suggestion.Intent == "analyze_logs" {
-		fmt.Println("\n--- Log Preview ---")
-		cmd := exec.Command("bash", "-c", suggestion.Command)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Printf("Error fetching logs: %v\n", err)
-		}
-		preview := string(output)
-		if len(preview) > 2000 {
-			preview = preview[len(preview)-2000:]
-		}
-		fmt.Println(preview)
-		fmt.Print("\nProceed with AI analysis of these logs? (y/n): ")
-		if !getUserConfirmation() {
-			fmt.Println("Log analysis cancelled.")
-			return
-		}
-		// AI or rule-based analysis
-		var analysis string
-		if claudeConfig := getClaudeConfigIfAvailable(); claudeConfig != nil {
-			prompt := `You are a DevOps assistant. Analyze the following logs for errors, warnings, or issues. If you find problems, explain them, suggest a fix, and provide a command to resolve if possible. If all looks fine, say so.\n\nLOGS:\n` + preview
-			analysis = callClaude(claudeConfig, "Log Analysis", prompt)
-		} else {
-			analysis = simpleLogAnalysis(preview)
-		}
-		fmt.Println("\n--- AI Log Analysis ---")
-		fmt.Println(analysis)
-		return
-	}
 }
 
 func executeCommand(suggestion *CommandSuggestion) {
