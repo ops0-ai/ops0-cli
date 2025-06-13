@@ -72,11 +72,6 @@ Here are some real-world examples of ops0 in action across different tools:
 ![Kubernetes Example](assets/kubernetes.png)
 *Example: Simplified Kubernetes cluster management and troubleshooting*
 
-### Log Path Analysis Demo
-![Log analysis from a path](assets/ops0-log-path-analysis.mp4)
-
-*This video demonstrates how users can perform analysis of logs on machines.*
-
 Each example demonstrates:
 - Natural language command input
 - AI-powered command translation

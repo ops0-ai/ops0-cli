@@ -69,12 +69,6 @@ ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 ![Kubernetes Example](assets/kubernetes.png)
 *示例：简化的 Kubernetes 集群管理和故障排除*
 
-### 日志路径分析演示
-
-<video src="assets/ops0-log-path-analysis.mp4" controls width="600"></video>
-
-*该视频演示了用户如何在机器上分析日志。*
-
 ## 支持的工具和功能
 
 ### 核心工具
