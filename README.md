@@ -72,6 +72,11 @@ Here are some real-world examples of ops0 in action across different tools:
 ![Kubernetes Example](assets/kubernetes.png)
 *Example: Simplified Kubernetes cluster management and troubleshooting*
 
+### Log Path Analysis Demo
+![Log analysis from a path](assets/ops0-log-path-analysis.mp4)
+
+*This video demonstrates how users can perform analysis of logs on machines.*
+
 Each example demonstrates:
 - Natural language command input
 - AI-powered command translation
@@ -120,12 +125,6 @@ ops0 -m "analyze logs for pod my-app-123 in namespace prod"
 # Analyze a specific log file for issues
 ops0 -m "analyze /var/log/nginx/error.log"
 ```
-
-### Log Path Analysis Demo
-
-<video src="assets/ops0-log-path-analysis.mp4" controls width="600"></video>
-
-*This video demonstrates how users can perform analysis of logs on machines.*
 
 ### Key Features
 - Natural language command translation
