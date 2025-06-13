@@ -484,6 +484,55 @@ func parseIntent(input string) *CommandSuggestion {
 		}
 	}
 
+	// System Admin patterns
+	if matched, _ := regexp.MatchString(`(install|update|upgrade).*package|apt.*install|yum.*install|dnf.*install`, input); matched {
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     extractPackageCommand(input),
+			Description: "This will manage packages on your system using the appropriate package manager.",
+			Intent:      "manage system packages",
+			Confidence:  0.9,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+	
+	if matched, _ := regexp.MatchString(`(start|stop|restart|status).*service|systemctl.*service`, input); matched {
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     extractServiceCommand(input),
+			Description: "This will manage system services using systemctl.",
+			Intent:      "manage system services",
+			Confidence:  0.9,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+	
+	if matched, _ := regexp.MatchString(`(check|show|display).*(disk|memory|cpu|system).*usage|df.*-h|free.*-h|top`, input); matched {
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     extractSystemMonitorCommand(input),
+			Description: "This will show system resource usage and monitoring information.",
+			Intent:      "monitor system resources",
+			Confidence:  0.9,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+	
+	if matched, _ := regexp.MatchString(`(check|show|display).*logs|journalctl|tail.*log`, input); matched {
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     extractLogCommand(input),
+			Description: "This will show system logs and journal entries.",
+			Intent:      "view system logs",
+			Confidence:  0.9,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+
 	return nil
 }
 
@@ -1404,4 +1453,87 @@ func findAnsiblePlaybookAndInventory(files map[string]string) (string, string) {
 		inventoryFile = "inventory.yml"
 	}
 	return playbookFile, inventoryFile
+}
+
+func extractPackageCommand(input string) string {
+	input = strings.ToLower(input)
+	
+	// Detect package manager
+	var pkgManager string
+	if isCommandAvailable("apt") {
+		pkgManager = "apt"
+	} else if isCommandAvailable("yum") {
+		pkgManager = "yum"
+	} else if isCommandAvailable("dnf") {
+		pkgManager = "dnf"
+	} else {
+		pkgManager = "apt" // Default to apt
+	}
+	
+	// Extract package name if present
+	re := regexp.MustCompile(`(install|update|upgrade)\s+([a-zA-Z0-9-]+)`)
+	match := re.FindStringSubmatch(input)
+	
+	if strings.Contains(input, "update") || strings.Contains(input, "upgrade") {
+		return fmt.Sprintf("sudo %s update && sudo %s upgrade -y", pkgManager, pkgManager)
+	}
+	
+	if len(match) > 2 {
+		return fmt.Sprintf("sudo %s install -y %s", pkgManager, match[2])
+	}
+	
+	return fmt.Sprintf("sudo %s update", pkgManager)
+}
+
+func extractServiceCommand(input string) string {
+	input = strings.ToLower(input)
+	
+	// Extract service name and action
+	re := regexp.MustCompile(`(start|stop|restart|status)\s+([a-zA-Z0-9-]+)`)
+	match := re.FindStringSubmatch(input)
+	
+	if len(match) > 2 {
+		action := match[1]
+		service := match[2]
+		return fmt.Sprintf("sudo systemctl %s %s", action, service)
+	}
+	
+	return "systemctl list-units --type=service --state=running"
+}
+
+func extractSystemMonitorCommand(input string) string {
+	input = strings.ToLower(input)
+	
+	if strings.Contains(input, "disk") || strings.Contains(input, "df") {
+		return "df -h"
+	}
+	
+	if strings.Contains(input, "memory") || strings.Contains(input, "free") {
+		return "free -h"
+	}
+	
+	if strings.Contains(input, "cpu") || strings.Contains(input, "top") {
+		return "top -b -n 1"
+	}
+	
+	return "df -h && free -h && top -b -n 1"
+}
+
+func extractLogCommand(input string) string {
+	input = strings.ToLower(input)
+	
+	if strings.Contains(input, "journal") || strings.Contains(input, "system") {
+		return "sudo journalctl -n 50"
+	}
+	
+	if strings.Contains(input, "tail") {
+		return "sudo tail -f /var/log/syslog"
+	}
+	
+	return "sudo journalctl -n 50"
+}
+
+func isCommandAvailable(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
 }
