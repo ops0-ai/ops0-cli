@@ -162,6 +162,14 @@ func main() {
 		}
 	}
 
+	// Post-process for log analysis intent if needed
+	if suggestion != nil && suggestion.Tool == "kubectl" && strings.Contains(suggestion.Command, "logs") {
+		msgLower := strings.ToLower(message)
+		if strings.Contains(msgLower, "analyze") || strings.Contains(msgLower, "review") {
+			suggestion.Intent = "analyze_logs"
+		}
+	}
+
 	// Fallback to rule-based parsing if AI didn't work or isn't available
 	if suggestion == nil {
 		suggestion = parseIntent(message)
@@ -533,6 +541,42 @@ func parseIntent(input string) *CommandSuggestion {
 			Command:     extractLogCommand(input),
 			Description: "This will show system logs and journal entries.",
 			Intent:      "view system logs",
+			Confidence:  0.9,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+
+	// Log analysis patterns
+	if matched, _ := regexp.MatchString(`(analyze|review|check|summarize|inspect).*(logs?|log files?|pod logs?)`, input); matched {
+		// Kubernetes pod log analysis
+		podRe := regexp.MustCompile(`pod\s+([a-zA-Z0-9-]+)`)
+		nsRe := regexp.MustCompile(`namespace\s+([a-zA-Z0-9-]+)`)
+		pod := ""
+		ns := "default"
+		if m := podRe.FindStringSubmatch(input); len(m) > 1 {
+			pod = m[1]
+		}
+		if m := nsRe.FindStringSubmatch(input); len(m) > 1 {
+			ns = m[1]
+		}
+		if pod != "" {
+			return &CommandSuggestion{
+				Tool:        "kubectl",
+				Command:     "kubectl logs " + pod + " -n " + ns + " --tail=100",
+				Description: "Fetch and analyze the last 100 log lines for pod '" + pod + "' in namespace '" + ns + "'.",
+				Intent:      "analyze_logs",
+				Confidence:  0.95,
+				AIGenerated: false,
+				HasDryRun:   false,
+			}
+		}
+		// Fallback: generic log analysis
+		return &CommandSuggestion{
+			Tool:        "system_admin",
+			Command:     extractLogCommand(input),
+			Description: "Fetch and analyze recent system logs.",
+			Intent:      "analyze_logs",
 			Confidence:  0.9,
 			AIGenerated: false,
 			HasDryRun:   false,
@@ -952,6 +996,36 @@ func handleInteraction(suggestion *CommandSuggestion) {
 	}
 
 	executeCommand(suggestion)
+
+	if suggestion.Intent == "analyze_logs" {
+		fmt.Println("\n--- Log Preview ---")
+		cmd := exec.Command("bash", "-c", suggestion.Command)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Error fetching logs: %v\n", err)
+		}
+		preview := string(output)
+		if len(preview) > 2000 {
+			preview = preview[len(preview)-2000:]
+		}
+		fmt.Println(preview)
+		fmt.Print("\nProceed with AI analysis of these logs? (y/n): ")
+		if !getUserConfirmation() {
+			fmt.Println("Log analysis cancelled.")
+			return
+		}
+		// AI or rule-based analysis
+		var analysis string
+		if claudeConfig := getClaudeConfigIfAvailable(); claudeConfig != nil {
+			prompt := `You are a DevOps assistant. Analyze the following logs for errors, warnings, or issues. If you find problems, explain them, suggest a fix, and provide a command to resolve if possible. If all looks fine, say so.\n\nLOGS:\n` + preview
+			analysis = callClaude(claudeConfig, "Log Analysis", prompt)
+		} else {
+			analysis = simpleLogAnalysis(preview)
+		}
+		fmt.Println("\n--- AI Log Analysis ---")
+		fmt.Println(analysis)
+		return
+	}
 }
 
 func executeCommand(suggestion *CommandSuggestion) {
@@ -1576,4 +1650,51 @@ func extractLogCommand(input string) string {
 func isCommandAvailable(cmd string) bool {
 	_, err := exec.LookPath(cmd)
 	return err == nil
+}
+
+func getClaudeConfigIfAvailable() *ClaudeConfig {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return nil
+	}
+	model := os.Getenv("OPS0_AI_MODEL")
+	if model == "" {
+		model = "claude-3-5-sonnet-20241022"
+	}
+	return &ClaudeConfig{
+		APIKey:    apiKey,
+		Model:     model,
+		MaxTokens: 1024,
+	}
+}
+
+func simpleLogAnalysis(logs string) string {
+	lines := strings.Split(logs, "\n")
+	errors, warns := []string{}, []string{}
+	for _, l := range lines {
+		if strings.Contains(strings.ToLower(l), "error") {
+			errors = append(errors, l)
+		}
+		if strings.Contains(strings.ToLower(l), "warn") {
+			warns = append(warns, l)
+		}
+	}
+	if len(errors) == 0 && len(warns) == 0 {
+		return "Logs look fine, no errors or warnings detected."
+	}
+	var b strings.Builder
+	if len(errors) > 0 {
+		b.WriteString("Errors found:\n")
+		for _, e := range errors {
+			b.WriteString("  " + e + "\n")
+		}
+	}
+	if len(warns) > 0 {
+		b.WriteString("Warnings found:\n")
+		for _, w := range warns {
+			b.WriteString("  " + w + "\n")
+		}
+	}
+	b.WriteString("\nRecommendation: Investigate the above issues.\n")
+	return b.String()
 }
