@@ -50,7 +50,6 @@ Here are some real-world examples of ops0 in action across different tools:
 
 ### ops0 statistics
 <img width="1022" alt="image" src="https://github.com/user-attachments/assets/000b01a3-6565-432d-96f1-cd64d912475c" />
-*Example: Displays all the statistics of commands that were used as part of ops0*
 
 ### AWS CLI Operations
 ![AWS CLI Example](assets/aws.png)
