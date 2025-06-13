@@ -44,17 +44,3 @@ snapshot:
 
 changelog:
   sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
-      - '^ci:'
-      - '^style:'
-      - '^refactor:'
-  groups:
-    - title: "🚀 Features"
-      regexp: "^feat"
-    - title: "🐛 Fixes"
-      regexp: "^fix"
-    - title: "🔧 Maintenance"
-      regexp: "^(chore|refactor|style|test|ci|docs)"
