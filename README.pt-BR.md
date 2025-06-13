@@ -74,11 +74,32 @@ Aqui estão alguns exemplos reais do ops0 em ação com diferentes ferramentas:
 - **Terraform** - Infraestrutura como Código
 - **Ansible** - Gerenciamento de Configuração
 - **Kubernetes (kubectl)** - Orquestração de Contêineres
-- **Docker** - Conteinerização
+- **Docker** - Containerização
 - **AWS CLI** - Amazon Web Services
 - **Helm** - Gerenciador de Pacotes Kubernetes
 - **gcloud** - Google Cloud Platform
 - **Azure CLI** - Microsoft Azure
+- **System Admin** - Administração de Sistemas Linux
+
+### Exemplos de Administração de Sistema
+```bash
+# Monitorar recursos do sistema
+ops0 -m "mostrar uso de memória na minha máquina"
+ops0 -m "verificar espaço em disco"
+ops0 -m "mostrar uso de CPU"
+
+# Gerenciar serviços do sistema
+ops0 -m "reiniciar serviço nginx"
+ops0 -m "verificar status do serviço apache2"
+
+# Gerenciamento de pacotes
+ops0 -m "instalar pacote docker"
+ops0 -m "atualizar pacotes do sistema"
+
+# Logs do sistema
+ops0 -m "mostrar logs do sistema"
+ops0 -m "verificar logs journalctl"
+```
 
 ### Recursos Principais
 - Tradução de linguagem natural

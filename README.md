@@ -89,6 +89,27 @@ Each example demonstrates:
 - **Helm** - Kubernetes Package Manager
 - **gcloud** - Google Cloud Platform
 - **Azure CLI** - Microsoft Azure
+- **System Admin** - Linux System Administration
+
+### System Administration Examples
+```bash
+# Monitor system resources
+ops0 -m "show memory usage on my machine"
+ops0 -m "check disk space"
+ops0 -m "display CPU usage"
+
+# Manage system services
+ops0 -m "restart service nginx"
+ops0 -m "check service status apache2"
+
+# Package management
+ops0 -m "install package docker"
+ops0 -m "update system packages"
+
+# System logs
+ops0 -m "show system logs"
+ops0 -m "check journal logs"
+```
 
 ### Key Features
 - Natural language command translation

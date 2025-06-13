@@ -71,7 +71,7 @@ Hier sind einige reale Beispiele von ops0 in verschiedenen Tools:
 ## Unterstützte Tools & Funktionen
 
 ### Kernwerkzeuge
-- **Terraform** - Infrastruktur als Code
+- **Terraform** - Infrastructure as Code
 - **Ansible** - Konfigurationsmanagement
 - **Kubernetes (kubectl)** - Container-Orchestrierung
 - **Docker** - Containerisierung
@@ -79,6 +79,27 @@ Hier sind einige reale Beispiele von ops0 in verschiedenen Tools:
 - **Helm** - Kubernetes-Paketmanager
 - **gcloud** - Google Cloud Platform
 - **Azure CLI** - Microsoft Azure
+- **System Admin** - Linux-Systemverwaltung
+
+### Systemverwaltungsbeispiele
+```bash
+# Systemressourcen überwachen
+ops0 -m "Speichernutzung auf meinem Computer anzeigen"
+ops0 -m "Festplattenspeicher prüfen"
+ops0 -m "CPU-Auslastung anzeigen"
+
+# Systemdienste verwalten
+ops0 -m "nginx-Dienst neu starten"
+ops0 -m "apache2-Dienststatus prüfen"
+
+# Paketverwaltung
+ops0 -m "docker-Paket installieren"
+ops0 -m "Systempakete aktualisieren"
+
+# Systemprotokolle
+ops0 -m "Systemprotokolle anzeigen"
+ops0 -m "Journalprotokolle prüfen"
+```
 
 ### Hauptfunktionen
 - Übersetzung natürlicher Sprache

@@ -79,6 +79,27 @@ ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 - **Helm** - Kubernetes 包管理器
 - **gcloud** - 谷歌云平台
 - **Azure CLI** - 微软 Azure
+- **System Admin** - Linux 系统管理
+
+### 系统管理示例
+```bash
+# 监控系统资源
+ops0 -m "显示我的机器内存使用情况"
+ops0 -m "检查磁盘空间"
+ops0 -m "显示 CPU 使用率"
+
+# 管理系统服务
+ops0 -m "重启 nginx 服务"
+ops0 -m "检查 apache2 服务状态"
+
+# 包管理
+ops0 -m "安装 docker 包"
+ops0 -m "更新系统包"
+
+# 系统日志
+ops0 -m "显示系统日志"
+ops0 -m "检查日志记录"
+```
 
 ### 主要功能
 - 自然语言命令转换

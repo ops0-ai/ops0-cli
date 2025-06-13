@@ -79,6 +79,27 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 - **Helm** - Gestionnaire de Paquets Kubernetes
 - **gcloud** - Google Cloud Platform
 - **Azure CLI** - Microsoft Azure
+- **System Admin** - Administration Système Linux
+
+### Exemples d'Administration Système
+```bash
+# Surveiller les ressources système
+ops0 -m "afficher l'utilisation de la mémoire sur ma machine"
+ops0 -m "vérifier l'espace disque"
+ops0 -m "afficher l'utilisation du CPU"
+
+# Gérer les services système
+ops0 -m "redémarrer le service nginx"
+ops0 -m "vérifier l'état du service apache2"
+
+# Gestion des paquets
+ops0 -m "installer le paquet docker"
+ops0 -m "mettre à jour les paquets système"
+
+# Journaux système
+ops0 -m "afficher les journaux système"
+ops0 -m "vérifier les journaux journalctl"
+```
 
 ### Fonctionnalités Clés
 - Traduction en langage naturel
