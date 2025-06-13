@@ -286,6 +286,24 @@ func showHelp() {
 func parseIntent(input string) *CommandSuggestion {
 	input = strings.ToLower(input)
 	
+	// System Admin patterns - Check these first
+	if matched, _ := regexp.MatchString(`(check|show|display|get).*(disk|memory|cpu|system).*usage|df.*-h|free.*-h|top`, input); matched {
+		// Check if it's specifically about local system
+		if strings.Contains(input, "device") || strings.Contains(input, "local") || 
+		   strings.Contains(input, "my") || strings.Contains(input, "machine") || 
+		   strings.Contains(input, "system") {
+			return &CommandSuggestion{
+				Tool:        "system_admin",
+				Command:     extractSystemMonitorCommand(input),
+				Description: "This will show system resource usage and monitoring information for your local machine.",
+				Intent:      "monitor local system resources",
+				Confidence:  0.95,
+				AIGenerated: false,
+				HasDryRun:   false,
+			}
+		}
+	}
+
 	// Terraform patterns
 	if matched, _ := regexp.MatchString(`(plan|planning).*iac|terraform.*plan|infrastructure.*plan`, input); matched {
 		return &CommandSuggestion{
@@ -509,18 +527,6 @@ func parseIntent(input string) *CommandSuggestion {
 		}
 	}
 	
-	if matched, _ := regexp.MatchString(`(check|show|display).*(disk|memory|cpu|system).*usage|df.*-h|free.*-h|top`, input); matched {
-		return &CommandSuggestion{
-			Tool:        "system_admin",
-			Command:     extractSystemMonitorCommand(input),
-			Description: "This will show system resource usage and monitoring information.",
-			Intent:      "monitor system resources",
-			Confidence:  0.9,
-			AIGenerated: false,
-			HasDryRun:   false,
-		}
-	}
-	
 	if matched, _ := regexp.MatchString(`(check|show|display).*logs|journalctl|tail.*log`, input); matched {
 		return &CommandSuggestion{
 			Tool:        "system_admin",
@@ -539,17 +545,22 @@ func parseIntent(input string) *CommandSuggestion {
 func getAISuggestion(config *ClaudeConfig, userInput string) *CommandSuggestion {
 	systemPrompt := `You are ops0, an AI-powered DevOps CLI assistant. Your job is to translate natural language requests into specific DevOps commands.
 
-You support these tools: terraform, ansible, kubectl, docker, helm, aws-cli, gcloud, azure-cli.
+You support these tools: terraform, ansible, kubectl, docker, helm, aws-cli, gcloud, azure-cli, system_admin.
+
+For system monitoring and resource usage requests:
+- If the request mentions "device", "machine", "local", "my", or "system", use system_admin tool
+- Use system_admin for memory, CPU, disk usage, and system logs
+- Only use docker/k8s tools if explicitly mentioning containers or clusters
 
 Respond with a JSON object in this exact format:
 {
-  "tool": "terraform",
-  "command": "terraform plan",
-  "dry_run_command": "terraform plan",
-  "description": "This will show you what changes Terraform will make",
-  "intent": "plan infrastructure changes",
+  "tool": "system_admin",
+  "command": "free -h",
+  "dry_run_command": "",
+  "description": "This will show memory usage on your local machine",
+  "intent": "monitor local system resources",
   "confidence": 0.95,
-  "has_dry_run": true
+  "has_dry_run": false
 }
 
 Rules:
@@ -557,11 +568,7 @@ Rules:
 - Prefer safe, read-only commands when possible
 - Include helpful descriptions
 - Set confidence between 0-1 based on how certain you are
-- For commands that modify state, provide a dry run command if available:
-  * terraform: use "terraform plan" for apply/destroy
-  * ansible: use "--check" flag
-  * kubectl: use "--dry-run=client" flag
-  * For read-only commands, set has_dry_run to false
+- For commands that modify state, provide a dry run command if available
 - If you can't understand the request, return null`
 
 	response := callClaude(config, systemPrompt, userInput)
@@ -765,6 +772,38 @@ func handleInteraction(suggestion *CommandSuggestion) {
 	toolName := suggestion.Tool
 	if toolName == "aws-cli" {
 		toolName = "aws"
+	}
+	
+	// Skip installation check for system_admin as it uses built-in commands
+	if toolName == "system_admin" {
+		// Prepare command details for display
+		var details []string
+		details = append(details, "Tool: System Administration")
+		details = append(details, "Intent: "+suggestion.Intent)
+		details = append(details, "Command: "+suggestion.Command)
+		if suggestion.HasDryRun {
+			details = append(details, "Dry Run: "+suggestion.DryRunCommand)
+		}
+		details = append(details, "Description: "+suggestion.Description)
+		if suggestion.AIGenerated {
+			details = append(details, fmt.Sprintf("AI Confidence: %.0f%%", suggestion.Confidence*100))
+		}
+
+		// Display command details
+		if suggestion.AIGenerated {
+			fmt.Print(formatSection("🧠 AI-Generated Command", details))
+		} else {
+			fmt.Print(formatSection("💡 Command Details", details))
+		}
+
+		fmt.Print("\nWould you like to execute this command? (y/n): ")
+		if !getUserConfirmation() {
+			fmt.Print("\n👋 No problem! Let me know if you need help with anything else.\n")
+			return
+		}
+
+		executeCommand(suggestion)
+		return
 	}
 	
 	tool := &Tool{
@@ -1504,19 +1543,20 @@ func extractServiceCommand(input string) string {
 func extractSystemMonitorCommand(input string) string {
 	input = strings.ToLower(input)
 	
-	if strings.Contains(input, "disk") || strings.Contains(input, "df") {
-		return "df -h"
-	}
-	
-	if strings.Contains(input, "memory") || strings.Contains(input, "free") {
+	if strings.Contains(input, "memory") || strings.Contains(input, "ram") {
 		return "free -h"
 	}
 	
-	if strings.Contains(input, "cpu") || strings.Contains(input, "top") {
+	if strings.Contains(input, "disk") || strings.Contains(input, "storage") || strings.Contains(input, "df") {
+		return "df -h"
+	}
+	
+	if strings.Contains(input, "cpu") || strings.Contains(input, "processor") || strings.Contains(input, "top") {
 		return "top -b -n 1"
 	}
 	
-	return "df -h && free -h && top -b -n 1"
+	// Default to showing all system resources
+	return "echo '=== Memory Usage ===' && free -h && echo -e '\n=== Disk Usage ===' && df -h && echo -e '\n=== CPU Usage ===' && top -b -n 1"
 }
 
 func extractLogCommand(input string) string {
