@@ -58,6 +58,7 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 
 ### Automatisation Ansible
 ![Ansible Example](assets/ansible.png)
+![Ansible Playbook](assets/ansible-playbook.png)
 *Exemple : Exécution et validation faciles des playbooks Ansible*
 
 ### Infrastructure Terraform

@@ -58,6 +58,7 @@ ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 
 ### Ansible 自动化
 ![Ansible Example](assets/ansible.png)
+![Ansible Playbook](assets/ansible-playbook.png)
 *示例：轻松执行和验证 Ansible playbook*
 
 ### Terraform 基础设施
