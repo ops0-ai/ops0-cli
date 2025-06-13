@@ -69,6 +69,12 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 ![Kubernetes Example](assets/kubernetes.png)
 *Exemple : Gestion simplifiée des clusters Kubernetes et dépannage*
 
+### Démonstration de l'Analyse de Chemin de Log
+
+<video src="assets/ops0-log-path-analysis.mp4" controls width="600"></video>
+
+*Cette vidéo montre comment les utilisateurs peuvent analyser les logs sur leurs machines.*
+
 ## Outils et Fonctionnalités Supportés
 
 ### Outils Principaux

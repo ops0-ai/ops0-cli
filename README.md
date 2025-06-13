@@ -121,6 +121,12 @@ ops0 -m "analyze logs for pod my-app-123 in namespace prod"
 ops0 -m "analyze /var/log/nginx/error.log"
 ```
 
+### Log Path Analysis Demo
+
+<video src="assets/ops0-log-path-analysis.mp4" controls width="600"></video>
+
+*This video demonstrates how users can perform analysis of logs on machines.*
+
 ### Key Features
 - Natural language command translation
 - AI-powered troubleshooting
