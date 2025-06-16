@@ -24,19 +24,6 @@ e gerando os comandos corretos, tornando o gerenciamento DevOps mais acessível 
 ![ops0 CLI Demo](assets/ops0cli.gif)
 *Veja o ops0 traduzir linguagem natural em poderosos comandos DevOps*
 
-## Início Rápido
-
-### Instale todas as ferramentas com um único comando
-
-![CLI Instalar Todas as Ferramentas](assets/cli-install.png)
-
-Agora você pode instalar todas as ferramentas DevOps suportadas com um único comando:
-
-```bash
-ops0 --install
-```
-
-Isso instalará automaticamente Terraform, Ansible, kubectl, Docker, Helm, AWS CLI, gcloud e Azure CLI, e mostrará suas versões em uma tabela de resumo.
 
 ### Instalação
 ```bash

@@ -24,20 +24,6 @@ ops0 是一个智能命令行工具，可以将自然语言转换为 DevOps 命�
 ![ops0 CLI Demo](assets/ops0cli.gif)
 *观看 ops0 如何将自然语言转换为强大的 DevOps 命令*
 
-## 快速开始
-
-### 一键安装所有工具
-
-![CLI 一键安装所有工具](assets/cli-install.png)
-
-现在，您可以通过一条命令安装所有支持的 DevOps 工具：
-
-```bash
-ops0 --install
-```
-
-该命令会自动安装 Terraform、Ansible、kubectl、Docker、Helm、AWS CLI、gcloud 和 Azure CLI，并在最后以表格形式显示所有工具的版本。
-
 ### 安装
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash

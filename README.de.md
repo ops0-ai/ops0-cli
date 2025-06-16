@@ -26,18 +26,6 @@ und die richtigen Befehle generiert, wodurch DevOps-Management zugänglicher und
 
 ## Schnellstart
 
-### Alle Tools mit einem Befehl installieren
-
-![CLI Install All Tools](assets/cli-install.png)
-
-Sie können jetzt alle unterstützten DevOps-Tools mit nur einem Befehl installieren:
-
-```bash
-ops0 --install
-```
-
-Damit werden Terraform, Ansible, kubectl, Docker, Helm, AWS CLI, gcloud und Azure CLI automatisch installiert und deren Versionen in einer Übersichtstabelle angezeigt.
-
 ### Installation
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
