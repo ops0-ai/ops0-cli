@@ -81,6 +81,18 @@ Aquí hay algunos ejemplos reales de ops0 en acción con diferentes herramientas
 ![Kubernetes Example](assets/kubernetes.png)
 *Ejemplo: Gestión simplificada de clusters Kubernetes y solución de problemas*
 
+### Instala todas las herramientas con un solo comando
+
+![CLI Instalar Todas las Herramientas](assets/cli-install.png)
+
+Ahora puedes instalar todas las herramientas DevOps soportadas con un solo comando:
+
+```bash
+ops0 --install
+```
+
+Esto instalará automáticamente Terraform, Ansible, kubectl, Docker, Helm, AWS CLI, gcloud y Azure CLI, y mostrará sus versiones en una tabla resumen.
+
 ## Herramientas y Funcionalidades Soportadas
 
 ### Herramientas Principales

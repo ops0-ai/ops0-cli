@@ -81,6 +81,18 @@ ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 ![Kubernetes Example](assets/kubernetes.png)
 *示例：简化的 Kubernetes 集群管理和故障排除*
 
+### 一键安装所有工具
+
+![CLI 一键安装所有工具](assets/cli-install.png)
+
+现在，您可以通过一条命令安装所有支持的 DevOps 工具：
+
+```bash
+ops0 --install
+```
+
+该命令会自动安装 Terraform、Ansible、kubectl、Docker、Helm、AWS CLI、gcloud 和 Azure CLI，并在最后以表格形式显示所有工具的版本。
+
 ## 支持的工具和功能
 
 ### 核心工具

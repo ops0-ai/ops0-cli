@@ -84,6 +84,18 @@ Here are some real-world examples of ops0 in action across different tools:
 ![Kubernetes Example](assets/kubernetes.png)
 *Example: Simplified Kubernetes cluster management and troubleshooting*
 
+### Install All Tools at Once
+
+![CLI Install All Tools](assets/cli-install.png)
+
+You can now install all supported DevOps tools with a single command:
+
+```bash
+ops0 --install
+```
+
+This will automatically install Terraform, Ansible, kubectl, Docker, Helm, AWS CLI, gcloud, and Azure CLI, and show their versions in a summary table.
+
 Each example demonstrates:
 - Natural language command input
 - AI-powered command translation
