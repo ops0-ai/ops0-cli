@@ -94,6 +94,7 @@ func main() {
 	var aiMode bool
 	var troubleshoot bool
 	var showStats bool
+	var installAll bool
 	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
 	flag.BoolVar(&displayHelp, "help", false, "show help information")
@@ -101,7 +102,13 @@ func main() {
 	flag.BoolVar(&aiMode, "ai", false, "use AI mode for advanced command generation")
 	flag.BoolVar(&troubleshoot, "troubleshoot", false, "troubleshooting mode with context analysis")
 	flag.BoolVar(&showStats, "stats", false, "show usage statistics")
+	flag.BoolVar(&installAll, "install", false, "install all supported tools")
 	flag.Parse()
+
+	if installAll {
+		installAllTools()
+		return
+	}
 
 	if displayHelp {
 		showHelp()
@@ -220,6 +227,7 @@ func showHelp() {
 	fmt.Println("  -troubleshoot Enable troubleshooting mode with context analysis")
 	fmt.Println("  -version     Show version information")
 	fmt.Println("  -help        Show this help message")
+	fmt.Println("  -install     Install all supported tools and display their versions")
 
 	// Supported Tools
 	fmt.Println("\n🛠️  Supported Tools:")
@@ -1727,4 +1735,41 @@ func simpleLogAnalysis(logs string) string {
 	}
 	b.WriteString("\nRecommendation: Investigate the above issues.\n")
 	return b.String()
+}
+
+func installAllTools() {
+	tools := []string{"terraform", "ansible", "kubectl", "docker", "helm", "aws", "gcloud", "az"}
+	fmt.Println("🔧 Installing all supported tools...")
+	for _, name := range tools {
+		tool := &Tool{
+			Name:       name,
+			CheckCmd:   name + " --version",
+			InstallCmd: getInstallCommand(name),
+		}
+		if checkToolInstalled(tool) {
+			fmt.Printf("✅ %s is already installed.\n", getToolDisplayName(name))
+			continue
+		}
+		fmt.Printf("🔧 Installing %s...\n", getToolDisplayName(name))
+		if installTool(tool) {
+			fmt.Printf("✅ %s installed successfully!\n", getToolDisplayName(name))
+		} else {
+			fmt.Printf("❌ Failed to install %s. Please install it manually.\n", getToolDisplayName(name))
+		}
+	}
+	fmt.Println("🎉 All tools processed.")
+
+	// Display table of installed tools and versions
+	fmt.Println("\n📦 Installed Tools:")
+	fmt.Println("────────────────────────────────────────────")
+	fmt.Printf("%-18s | %-20s\n", "Tool", "Version")
+	fmt.Println(strings.Repeat("-", 42))
+	for _, name := range tools {
+		ver := getToolVersion(name)
+		if ver == "" {
+			ver = "Not installed"
+		}
+		fmt.Printf("%-18s | %-20s\n", getToolDisplayName(name), ver)
+	}
+	fmt.Println(strings.Repeat("-", 42))
 }
