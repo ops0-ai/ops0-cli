@@ -42,7 +42,12 @@ ops0 -m "check if my kubernetes pods are running" -ai
 
 # Troubleshooting mode
 ops0 -m "my terraform apply is failing with state lock" -troubleshoot
+
+# Interactive operations mode
+ops0 -o
 ```
+
+*Use `ops0 -o` for interactive operations mode: enter natural language requests and run multiple operations in a session until you type 'quit' or 'exit'.*
 
 ## Command Examples in Action
 

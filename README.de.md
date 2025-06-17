@@ -34,15 +34,20 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 ### Grundlegende Verwendung
 ```bash
 # Regelbasierter Modus (kein API-Schlüssel erforderlich)
-ops0 -m "i want to plan my iac code"
+ops0 -m "ich möchte meinen IaC-Code planen"
 
 # KI-gestützter Modus (API-Schlüssel erforderlich)
 export ANTHROPIC_API_KEY=your_key_here
-ops0 -m "check if my kubernetes pods are running" -ai
+ops0 -m "prüfe, ob meine kubernetes pods laufen" -ai
 
 # Fehlerbehebungsmodus
-ops0 -m "my terraform apply is failing with state lock" -troubleshoot
+ops0 -m "mein terraform apply schlägt wegen state lock fehl" -troubleshoot
+
+# Interaktiver Operationsmodus
+ops0 -o
 ```
+
+*Nutzen Sie `ops0 -o` für den interaktiven Operationsmodus: Geben Sie natürliche Sprache ein und führen Sie mehrere Operationen in einer Sitzung aus, bis Sie 'quit' oder 'exit' eingeben.*
 
 ## Befehlsbeispiele in Aktion
 

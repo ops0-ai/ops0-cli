@@ -32,15 +32,20 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 ### 基本用法
 ```bash
 # 规则模式 (无需 API 密钥)
-ops0 -m "i want to plan my iac code"
+ops0 -m "我想规划我的基础设施代码"
 
 # AI 支持模式 (需要 API 密钥)
 export ANTHROPIC_API_KEY=your_key_here
-ops0 -m "check if my kubernetes pods are running" -ai
+ops0 -m "检查我的 kubernetes pods 是否在运行" -ai
 
 # 故障排除模式
-ops0 -m "my terraform apply is failing with state lock" -troubleshoot
+ops0 -m "我的 terraform apply 因 state lock 失败" -troubleshoot
+
+# 交互式操作模式
+ops0 -o
 ```
+
+*使用 `ops0 -o` 进入交互式操作模式：输入自然语言请求，连续执行多项操作，直到输入 'quit' 或 'exit' 结束会话。*
 
 ## 命令示例展示
 
