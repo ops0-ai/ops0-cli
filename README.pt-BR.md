@@ -14,7 +14,7 @@
 ---
 
 <p align="center">
-ops0 é uma ferramenta CLI inteligente que transforma linguagem natural em comandos DevOps.<br>
+ops0 é uma ferramenta CLI inteligente que transforma linguagem natural em operações DevOps.<br>
 Alimentado por Claude AI, simplifica tarefas complexas de DevOps entendendo sua intenção<br>
 e gerando os comandos corretos, tornando o gerenciamento DevOps mais acessível e eficiente.
 </p>
@@ -22,7 +22,7 @@ e gerando os comandos corretos, tornando o gerenciamento DevOps mais acessível 
 ## ops0 em Ação
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
-*Veja o ops0 traduzir linguagem natural em poderosos comandos DevOps*
+*Veja o ops0 traduzir linguagem natural em poderosos operações DevOps*
 
 
 ### Instalação
@@ -43,7 +43,7 @@ ops0 -m "check if my kubernetes pods are running" -ai
 ops0 -m "my terraform apply is failing with state lock" -troubleshoot
 ```
 
-## Exemplos de Comandos em Ação
+## Exemplos de Operações em Ação
 
 Aqui estão alguns exemplos reais do ops0 em ação com diferentes ferramentas:
 
@@ -156,7 +156,7 @@ export OPS0_MAX_TOKENS=1024                    # Comprimento da resposta
 ## Privacidade e Segurança
 
 - **Chave API**: Armazenada localmente como variável de ambiente
-- **Sem Armazenamento de Dados**: Comandos e contexto não são armazenados pelo ops0
+- **Sem Armazenamento de Dados**: Operações e contexto não são armazenados pelo ops0
 - **Privacidade Anthropic**: Segue as políticas de tratamento de dados da Anthropic
 - **Processamento Local**: Modo regras funciona completamente offline
 
@@ -182,5 +182,5 @@ export OPS0_MAX_TOKENS=1024                    # Comprimento da resposta
 1. **Seja Específico**: "Meu plano terraform mostra 5 recursos alterando" vs "erro terraform"
 2. **Use o Modo de Solução de Problemas**: Para problemas complexos, use a flag `-troubleshoot`
 3. **Verifique o Contexto**: A IA funciona melhor no diretório correto
-4. **Revise os Comandos**: Sempre revise as sugestões da IA antes de confirmar
+4. **Revise os Operações**: Sempre revise as sugestões da IA antes de confirmar
 5. **Forneça Feedback**: Use GitHub Issues para reportar problemas de precisão da IA 

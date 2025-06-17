@@ -14,15 +14,15 @@
 ---
 
 <p align="center">
-ops0 是一个智能命令行工具，可以将自然语言转换为 DevOps 命令。<br>
+ops0 是一个智能命令行工具，可以将自然语言转换为 DevOps 操作。<br>
 由 Claude AI 提供支持，它通过理解您的意图来简化复杂的 DevOps 任务，<br>
-生成正确的命令，使 DevOps 管理更加便捷高效。
+执行正确的操作，使 DevOps 管理更加便捷高效。
 </p>
 
 ## ops0 演示
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
-*观看 ops0 如何将自然语言转换为强大的 DevOps 命令*
+*观看 ops0 如何将自然语言转换为强大的 DevOps 操作*
 
 ### 安装
 ```bash

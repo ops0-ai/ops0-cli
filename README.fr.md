@@ -14,15 +14,15 @@
 ---
 
 <p align="center">
-ops0 est un outil CLI intelligent qui transforme le langage naturel en commandes DevOps.<br>
+ops0 est un outil CLI intelligent qui transforme le langage naturel en opérations DevOps.<br>
 Propulsé par Claude AI, il simplifie les tâches DevOps complexes en comprenant vos intentions<br>
-et en générant les bonnes commandes, rendant la gestion DevOps plus accessible et efficace.
+et en effectuant les bonnes opérations, rendant la gestion DevOps plus accessible et efficace.
 </p>
 
 ## ops0 en Action
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
-*Regardez ops0 traduire le langage naturel en puissantes commandes DevOps*
+*Regardez ops0 traduire le langage naturel en puissantes opérations DevOps*
 
 ### Installation
 ```bash
@@ -117,69 +117,3 @@ ops0 -m "mettre à jour les paquets système"
 ops0 -m "afficher les journaux système"
 ops0 -m "vérifier les journaux journalctl"
 ```
-
-### Fonctionnalités Clés
-- Traduction en langage naturel
-- Dépannage assisté par IA
-- **Analyse des logs de pods Kubernetes avec résumé IA et suggestions de commandes**
-- **Analyse de fichiers de logs pour détection de problèmes et contexte**
-- Suggestions contextuelles
-- Exécution sécurisée avec confirmation
-- Support de simulation pour les opérations destructives
-- Installation automatique des outils
-
-## Mode IA vs Mode Règles
-
-| Fonctionnalité | Mode Règles | Mode IA |
-|---------|------------|---------|
-| Configuration | Pas de clé API | Nécessite ANTHROPIC_API_KEY |
-| Vitesse | Instantané | ~2-3 secondes |
-| Compréhension | Correspondance de motifs | Langage naturel |
-| Conscience contextuelle | Limitée | Élevée |
-| Dépannage | Basique | Avancé |
-| Scénarios complexes | Limité | Excellent |
-| Utilisation hors ligne | ✅ | ❌ |
-
-## Configuration
-
-### Variables d'Environnement
-```bash
-# Requis pour les fonctionnalités IA
-export ANTHROPIC_API_KEY=your_api_key
-
-# Optionnel : Personnaliser le comportement de l'IA
-export OPS0_AI_MODEL=claude-3-sonnet-20240229  # Modèle par défaut
-export OPS0_MAX_TOKENS=1024                    # Longueur de réponse
-```
-
-## Confidentialité et Sécurité
-
-- **Clé API** : Stockée localement comme variable d'environnement
-- **Pas de Stockage de Données** : Les commandes et le contexte ne sont pas stockés par ops0
-- **Confidentialité Anthropic** : Suit les politiques de traitement des données d'Anthropic
-- **Traitement Local** : Le mode règles fonctionne entièrement hors ligne
-
-## Feuille de Route
-
-### Actuel
-- [x] Intégration Claude AI
-- [x] Mode de dépannage basique
-- [x] Conscience contextuelle
-- [x] Support multi-outils
-
-### À Venir
-- [ ] Modèle personnalisé pour environnements hors ligne
-- [ ] Workflows interactifs multi-étapes
-- [ ] Apprentissage à partir des retours utilisateurs
-- [ ] Configurations d'outils personnalisées
-- [ ] Support de multiples fournisseurs IA
-- [ ] Analyse contextuelle avancée
-- [ ] Fonctionnalités de collaboration d'équipe
-
-## Conseils
-
-1. **Soyez Spécifique** : "Mon plan terraform montre 5 ressources modifiées" vs "erreur terraform"
-2. **Utilisez le Mode Dépannage** : Pour les problèmes complexes, utilisez le flag `-troubleshoot`
-3. **Vérifiez le Contexte** : L'IA fonctionne mieux dans le bon répertoire
-4. **Vérifiez les Commandes** : Toujours examiner les suggestions de l'IA avant confirmation
-5. **Donnez des Retours** : Utilisez GitHub Issues pour signaler les problèmes de précision de l'IA 

@@ -14,15 +14,15 @@
 ---
 
 <p align="center">
-ops0 ist ein intelligentes CLI-Tool, das natürliche Sprache in DevOps-Befehle umwandelt.<br>
+ops0 ist ein intelligentes CLI-Tool, das natürliche Sprache in DevOps-Operationen umwandelt.<br>
 Unterstützt durch Claude AI vereinfacht es komplexe DevOps-Aufgaben, indem es Ihre Absicht versteht<br>
-und die richtigen Befehle generiert, wodurch DevOps-Management zugänglicher und effizienter wird.
+und die richtigen Operationen ausführt, wodurch DevOps-Management zugänglicher und effizienter wird.
 </p>
 
 ## ops0 in Aktion
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
-*Sehen Sie, wie ops0 natürliche Sprache in leistungsstarke DevOps-Befehle übersetzt*
+*Sehen Sie, wie ops0 natürliche Sprache in leistungsstarke DevOps-Operationen übersetzt*
 
 ## Schnellstart
 
@@ -50,7 +50,7 @@ Hier sind einige reale Beispiele von ops0 in verschiedenen Tools:
 
 ### AWS CLI-Operationen
 ![AWS CLI Example](assets/aws.png)
-*Beispiel: Verwaltung von AWS-Ressourcen mit natürlichsprachlichen Befehlen*
+*Beispiel: Verwaltung von AWS-Ressourcen mit natürlichsprachlichen Operationen*
 
 ### Docker-Container-Verwaltung
 ![Docker Example](assets/docker.png)
@@ -160,7 +160,7 @@ export OPS0_MAX_TOKENS=1024                    # Antwortlänge
 ## Datenschutz & Sicherheit
 
 - **API-Schlüssel**: Lokal als Umgebungsvariable gespeichert
-- **Keine Datenspeicherung**: Befehle und Kontext werden nicht von ops0 gespeichert
+- **Keine Datenspeicherung**: Operationen und Kontext werden nicht von ops0 gespeichert
 - **Anthropic-Datenschutz**: Folgt Anthropics Datenverarbeitungsrichtlinien
 - **Lokale Verarbeitung**: Regelbasierter Modus arbeitet vollständig offline
 
@@ -186,5 +186,5 @@ export OPS0_MAX_TOKENS=1024                    # Antwortlänge
 1. **Seien Sie spezifisch**: "Mein Terraform-Plan zeigt 5 Ressourcenänderungen" vs. "Terraform-Fehler"
 2. **Nutzen Sie den Fehlerbehebungsmodus**: Für komplexe Probleme verwenden Sie die `-troubleshoot`-Flag
 3. **Prüfen Sie den Kontext**: KI funktioniert besser im richtigen Verzeichnis
-4. **Überprüfen Sie Befehle**: Prüfen Sie immer KI-Vorschläge vor der Bestätigung
+4. **Überprüfen Sie Operationen**: Prüfen Sie immer KI-Vorschläge vor der Bestätigung
 5. **Geben Sie Feedback**: Nutzen Sie GitHub Issues für KI-Genauigkeitsprobleme 

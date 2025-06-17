@@ -14,9 +14,9 @@
 ---
 
 <p align="center">
-ops0 es una herramienta CLI inteligente que transforma el lenguaje natural en comandos DevOps.<br>
+ops0 es una herramienta CLI inteligente que transforma el lenguaje natural en operaciones DevOps.<br>
 Impulsado por Claude AI, simplifica las tareas complejas de DevOps entendiendo tu intención<br>
-y generando los comandos correctos, haciendo la gestión DevOps más accesible y eficiente.
+y realizando las operaciones correctas, haciendo la gestión DevOps más accesible y eficiente.
 </p>
 
 ## ops0 en Acción

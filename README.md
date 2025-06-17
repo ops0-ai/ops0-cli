@@ -14,15 +14,15 @@
 ---
 
 <p align="center">
-ops0 is an intelligent CLI tool that transforms natural language into DevOps commands.<br>
+ops0 is an intelligent CLI tool that transforms natural language into DevOps operations.<br>
 Powered by Claude AI, it simplifies complex DevOps tasks by understanding your intent<br>
-and generating the right commands, making DevOps management more accessible and efficient.
+and performing the right operations, making DevOps management more accessible and efficient.
 </p>
 
 ## ops0 in Action
 
 ![ops0 CLI Demo](assets/ops0cli.gif)
-*Watch ops0 translate natural language into powerful DevOps commands*
+*Watch ops0 translate natural language into powerful DevOps operations*
 
 ## Quick Start
 
@@ -136,7 +136,7 @@ ops0 -m "analyze /var/log/nginx/error.log"
 ### Key Features
 - Natural language command translation
 - AI-powered troubleshooting
-- **Kubernetes pod log analysis with AI summary and suggested commands**
+- **Kubernetes pod log analysis with AI summary and suggested operations**
 - **Log file path analysis for issues and context**
 - Context-aware suggestions
 - Safe execution with confirmations
