@@ -95,6 +95,7 @@ func main() {
 	var troubleshoot bool
 	var showStats bool
 	var installAll bool
+	var interactiveMode bool
 	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
 	flag.BoolVar(&displayHelp, "help", false, "show help information")
@@ -103,10 +104,16 @@ func main() {
 	flag.BoolVar(&troubleshoot, "troubleshoot", false, "troubleshooting mode with context analysis")
 	flag.BoolVar(&showStats, "stats", false, "show usage statistics")
 	flag.BoolVar(&installAll, "install", false, "install all supported tools")
+	flag.BoolVar(&interactiveMode, "o", false, "operations interactive mode")
 	flag.Parse()
 
 	if installAll {
 		installAllTools()
+		return
+	}
+
+	if interactiveMode {
+		runInteractiveSession()
 		return
 	}
 
@@ -1772,4 +1779,101 @@ func installAllTools() {
 		fmt.Printf("%-18s | %-20s\n", getToolDisplayName(name), ver)
 	}
 	fmt.Println(strings.Repeat("-", 42))
+}
+
+func runInteractiveSession() {
+	fmt.Println("🔄 ops0 Interactive Operations Mode (type 'quit' or 'exit' to leave)")
+	reader := bufio.NewReader(os.Stdin)
+	var claudeConfig *ClaudeConfig
+	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+		model := os.Getenv("OPS0_AI_MODEL")
+		if model == "" {
+			model = "claude-3-5-sonnet-20241022"
+		}
+		claudeConfig = &ClaudeConfig{
+			APIKey:    apiKey,
+			Model:     model,
+			MaxTokens: 1024,
+		}
+		fmt.Println("🧠 AI mode enabled in interactive session")
+	}
+	for {
+		fmt.Print("ops0> ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "quit" || input == "exit" {
+			fmt.Println("👋 Exiting ops0 operations mode.")
+			break
+		}
+		if input == "" {
+			continue
+		}
+		var suggestion *CommandSuggestion
+		if claudeConfig != nil {
+			suggestion = getAISuggestion(claudeConfig, input)
+		}
+		if suggestion == nil {
+			suggestion = parseIntent(input)
+		}
+		if suggestion != nil {
+			// Post-process for log file analysis intent if needed
+			if strings.Contains(suggestion.Command, ".log") {
+				msgLower := strings.ToLower(input)
+				if strings.Contains(msgLower, "analyze") || strings.Contains(msgLower, "debug") ||
+				   strings.Contains(msgLower, "review") || strings.Contains(msgLower, "check") ||
+				   strings.Contains(msgLower, "summarize") || strings.Contains(msgLower, "inspect") {
+					suggestion.Intent = "analyze_logs"
+					// Use a safe preview command for analysis, not tail -f
+					re := regexp.MustCompile(`([^-\s]+\.log)`)
+					if m := re.FindStringSubmatch(suggestion.Command); len(m) > 1 {
+						suggestion.Command = "tail -n 100 " + m[1]
+					}
+				}
+			}
+			if suggestion.Intent == "analyze_logs" {
+				// Log analysis flow: preview, prompt for AI, show summary
+				fmt.Println("\n--- Log Preview ---")
+				cmd := exec.Command("bash", "-c", suggestion.Command)
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					fmt.Printf("Error fetching logs: %v\n", err)
+				}
+				preview := string(output)
+				if len(preview) > 2000 {
+					preview = preview[len(preview)-2000:]
+				}
+				fmt.Println(preview)
+				fmt.Print("\nProceed with AI analysis of these logs? (y/n): ")
+				confirm, _ := reader.ReadString('\n')
+				confirm = strings.TrimSpace(strings.ToLower(confirm))
+				if confirm != "y" && confirm != "yes" {
+					fmt.Println("Log analysis cancelled.")
+					continue
+				}
+				// AI or rule-based analysis
+				var analysis string
+				if claudeConfig != nil {
+					prompt := `You are a DevOps assistant. Analyze the following logs for errors, warnings, or issues. If you find problems, explain them, suggest a fix, and provide a command to resolve if possible. If all looks fine, say so.\n\nLOGS:\n` + preview
+					analysis = callClaude(claudeConfig, "Log Analysis", prompt)
+				} else {
+					analysis = simpleLogAnalysis(preview)
+				}
+				fmt.Println("\n--- AI Log Analysis ---")
+				fmt.Println(analysis)
+				continue
+			}
+			// Show operation details and prompt for confirmation
+			fmt.Printf("\n💡 Operation: %s\nCommand: %s\nDescription: %s\n", suggestion.Intent, suggestion.Command, suggestion.Description)
+			fmt.Print("Would you like to execute this operation? (y/n): ")
+			confirm, _ := reader.ReadString('\n')
+			confirm = strings.TrimSpace(strings.ToLower(confirm))
+			if confirm == "y" || confirm == "yes" {
+				go executeCommand(suggestion)
+			} else {
+				fmt.Println("❌ Operation cancelled.")
+			}
+		} else {
+			fmt.Println("❌ Could not understand the operation.")
+		}
+	}
 }
