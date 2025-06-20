@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -96,6 +97,8 @@ func main() {
 	var showStats bool
 	var installAll bool
 	var interactiveMode bool
+	var adminMode string
+	var kafkaBrokers string
 	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
 	flag.BoolVar(&displayHelp, "help", false, "show help information")
@@ -105,10 +108,27 @@ func main() {
 	flag.BoolVar(&showStats, "stats", false, "show usage statistics")
 	flag.BoolVar(&installAll, "install", false, "install all supported tools")
 	flag.BoolVar(&interactiveMode, "o", false, "operations interactive mode")
+	flag.StringVar(&adminMode, "admin", "", "enter admin mode for a specific service (e.g., 'kafka')")
+	flag.StringVar(&kafkaBrokers, "brokers", "", "comma-separated list of Kafka brokers for admin mode")
 	flag.Parse()
 
 	if installAll {
 		installAllTools()
+		return
+	}
+
+	if adminMode != "" {
+		switch adminMode {
+		case "kafka":
+			if kafkaBrokers == "" {
+				fmt.Println("❌ ops0: --brokers flag is required for Kafka admin mode")
+				os.Exit(1)
+			}
+			runKafkaAdminSession(kafkaBrokers)
+		default:
+			fmt.Printf("❌ ops0: Unknown admin mode '%s'. Supported modes: kafka\n", adminMode)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -222,6 +242,8 @@ func showHelp() {
 	// Basic Usage
 	fmt.Println("📋 Usage:")
 	fmt.Println("  ops0 -m \"your natural language command\"")
+	fmt.Println("  ops0 -o")
+	fmt.Println("  ops0 --admin kafka --brokers <broker_list>")
 	fmt.Println("  ops0 -m \"command\" -ai")
 	fmt.Println("  ops0 -m \"error description\" -troubleshoot")
 	fmt.Println("  ops0 -version")
@@ -230,11 +252,14 @@ func showHelp() {
 	// Flags
 	fmt.Println("\n🚩 Flags:")
 	fmt.Println("  -m           Natural language command message (required)")
+	fmt.Println("  -o           Enter interactive operations mode")
 	fmt.Println("  -ai          Enable AI mode for advanced command generation")
 	fmt.Println("  -troubleshoot Enable troubleshooting mode with context analysis")
 	fmt.Println("  -version     Show version information")
 	fmt.Println("  -help        Show this help message")
 	fmt.Println("  -install     Install all supported tools and display their versions")
+	fmt.Println("  --admin      Enter admin mode for a service (e.g., 'kafka')")
+	fmt.Println("  --brokers    Comma-separated list of Kafka brokers for admin mode")
 
 	// Supported Tools
 	fmt.Println("\n🛠️  Supported Tools:")
@@ -1128,6 +1153,8 @@ func getToolDisplayName(toolName string) string {
 		return "Azure CLI"
 	case "kubectl":
 		return "Kubernetes CLI"
+	case "kafka":
+		return "Apache Kafka"
 	default:
 		return strings.Title(toolName)
 	}
@@ -1224,6 +1251,15 @@ func getInstallCommand(toolName string) string {
 			return "brew install azure-cli"
 		}
 		return "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash"
+	case "kafka":
+		if runtime.GOOS == "darwin" {
+			if runtime.GOARCH == "arm64" {
+				return "arch -arm64 brew install kafka"
+			}
+			return "brew install kafka"
+		}
+		// For Linux, download from Apache, extract, and symlink binaries
+		return "echo 'Downloading and installing Apache Kafka...' && KAFKA_VERSION=\"3.7.0\" && SCALA_VERSION=\"2.13\" && curl -L \"https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz\" -o kafka.tgz && tar -xzf kafka.tgz && sudo mv kafka_${SCALA_VERSION}-${KAFKA_VERSION} /usr/local/kafka && sudo ln -s /usr/local/kafka/bin/* /usr/local/bin/ && rm kafka.tgz && echo 'Kafka installed to /usr/local/kafka. Binaries symlinked to /usr/local/bin.'"
 	default:
 		return ""
 	}
@@ -1876,4 +1912,258 @@ func runInteractiveSession() {
 			fmt.Println("❌ Could not understand the operation.")
 		}
 	}
+}
+
+func runKafkaAdminSession(brokers string) {
+	// Prerequisite check for Homebrew on macOS
+	if runtime.GOOS == "darwin" {
+		if _, err := findCommand("brew"); err != nil {
+			fmt.Println(yellow + "⚠️  Homebrew is not available in your PATH." + reset)
+			fmt.Println("   ops0 uses Homebrew to manage software on macOS. To proceed, you must")
+			fmt.Println("   ensure Homebrew is installed and configured correctly.")
+			fmt.Println("\n   Please run the appropriate command for your system, then " + bold + "restart your terminal" + reset + ":")
+
+			// Suggest command based on architecture
+			var brewPath string
+			if runtime.GOARCH == "arm64" { // Apple Silicon
+				brewPath = "/opt/homebrew/bin"
+			} else { // Intel
+				brewPath = "/usr/local/bin"
+			}
+
+			shell := os.Getenv("SHELL")
+			profileFile := "~/.zshrc" // default for modern macOS
+			if strings.Contains(shell, "bash") {
+				profileFile = "~/.bash_profile"
+			}
+
+			fmt.Printf(bold+"   echo 'export PATH=\"%s:$PATH\"' >> %s"+reset+"\n\n", brewPath, profileFile)
+			fmt.Println("   If you don't have Homebrew installed, visit https://brew.sh")
+			os.Exit(1)
+		}
+	}
+
+	// 1. Check if kafka-topics.sh is available
+	cmdPath, err := findCommand("kafka-topics")
+	if err != nil {
+		if err.Error() == "found_not_in_path" {
+			fmt.Println(yellow + "⚠️  Kafka tools are installed but not found in your current PATH." + reset)
+			fmt.Println("   This is common after installing with Homebrew. To fix this,")
+			fmt.Println("   add Homebrew's bin directory to your shell's configuration file.")
+
+			// Suggest command based on shell
+			shell := os.Getenv("SHELL")
+			profileFile := "~/.bash_profile" // default
+			if strings.Contains(shell, "zsh") {
+				profileFile = "~/.zshrc"
+			} else if strings.Contains(shell, "bash") {
+				profileFile = "~/.bashrc"
+			}
+
+			brewPath := filepath.Dir(cmdPath)
+
+			fmt.Println("\n   Run this command, then " + bold + "restart your terminal" + reset + ":")
+			fmt.Printf(bold+"   echo 'export PATH=\"%s:$PATH\"' >> %s"+reset+"\n\n", brewPath, profileFile)
+		} else { // "not_found"
+			fmt.Println(red + "❌ Kafka command-line tools not found." + reset)
+			fmt.Print("Would you like to try and install Kafka now? (y/n): ")
+			if getUserConfirmation() {
+				kafkaTool := &Tool{
+					Name:       "kafka",
+					CheckCmd:   "kafka-topics --version",
+					InstallCmd: getInstallCommand("kafka"),
+				}
+				if installTool(kafkaTool) {
+					fmt.Println(green + "✅ Kafka installed successfully!" + reset)
+					fmt.Println(yellow + "Please " + bold + "restart your terminal session" + reset + " for the PATH changes to take effect, then run the command again." + reset)
+				} else {
+					fmt.Println(red + "❌ Kafka installation failed. Please install it manually." + reset)
+				}
+			} else {
+				fmt.Println("   Exiting. Please install Kafka and ensure its 'bin' directory is in your system's PATH.")
+			}
+		}
+		os.Exit(1)
+	}
+
+	// 2. Test connection to the cluster
+	fmt.Printf("Connecting to Kafka cluster at %s...\n", brokers)
+	testCmd := exec.Command(cmdPath, "--bootstrap-server", brokers, "--list")
+	testCmd.Stderr = os.Stderr
+	if err := testCmd.Run(); err != nil {
+		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and network connectivity."+reset+"\n", err)
+		os.Exit(1)
+	}
+	fmt.Println(green + "✅ Connection successful." + reset)
+
+	// 3. Setup interactive session
+	fmt.Printf("Entering Kafka Admin Mode. Type 'quit' or 'exit' to leave, or 'stats' to see session statistics.\n")
+	reader := bufio.NewReader(os.Stdin)
+	claudeConfig := getClaudeConfigIfAvailable()
+	if claudeConfig == nil {
+		fmt.Println(yellow + "⚠️  Warning: ANTHROPIC_API_KEY not set. Kafka admin mode requires AI." + reset)
+		fmt.Println("   Please set the key to enable natural language commands.")
+		os.Exit(1)
+	}
+	kafkaStats := make(map[string]int)
+
+	// 4. Start REPL
+	for {
+		fmt.Printf(blue+"kafka-admin@%s> "+reset, brokers)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "quit" || input == "exit" {
+			fmt.Println("👋 Exiting Kafka Admin Mode.")
+			break
+		}
+		if input == "stats" {
+			displayKafkaStats(kafkaStats)
+			continue
+		}
+		if input == "" {
+			continue
+		}
+
+		suggestion := getKafkaAISuggestion(claudeConfig, input, brokers)
+
+		if suggestion != nil {
+			// Show operation details and prompt for confirmation
+			fmt.Printf("\n"+bold+"💡 Suggested Operation:"+reset+"\n")
+			fmt.Printf("   Intent: %s\n", suggestion.Intent)
+			fmt.Printf("   Command: %s\n", suggestion.Command)
+			fmt.Printf("   Description: %s\n", suggestion.Description)
+			fmt.Print("\nExecute this operation? (y/n): ")
+
+			confirm, _ := reader.ReadString('\n')
+			confirm = strings.TrimSpace(strings.ToLower(confirm))
+
+			if confirm == "y" || confirm == "yes" {
+				// Prepend full path to the executable part of the command string
+				parts := strings.Fields(suggestion.Command)
+				if len(parts) > 0 && !strings.Contains(parts[0], "/") {
+					baseCmd := parts[0]
+					// Find the full path to the base command
+					fullCmdPath, findErr := findCommand(baseCmd)
+					if findErr == nil {
+						suggestion.Command = strings.Replace(suggestion.Command, baseCmd, fullCmdPath, 1)
+					}
+				}
+				if suggestion.Intent != "" {
+					kafkaStats[suggestion.Intent]++
+				}
+				executeCommand(suggestion)
+			} else {
+				fmt.Println("❌ Operation cancelled.")
+			}
+		} else {
+			fmt.Println("❌ Could not understand the Kafka operation.")
+		}
+	}
+}
+
+func getKafkaAISuggestion(config *ClaudeConfig, userInput, brokers string) *CommandSuggestion {
+	systemPrompt := fmt.Sprintf(`You are an expert Kafka administrator's assistant. Your sole job is to translate natural language user requests into the appropriate Kafka command-line tool command (e.g., kafka-topics, kafka-console-consumer, kafka-configs).
+
+The user is connected to the Kafka cluster at: %s
+**You must inject '--bootstrap-server %s' into every command you generate.** Do not use full paths for the kafka commands (e.g. use 'kafka-topics' not '/usr/local/bin/kafka-topics').
+
+Here are some examples of Kafka commands:
+- List topics: kafka-topics --bootstrap-server %s --list
+- Describe a topic: kafka-topics --bootstrap-server %s --describe --topic my-topic
+- Create a topic: kafka-topics --bootstrap-server %s --create --topic new-topic --partitions 1 --replication-factor 1
+- Delete a topic: kafka-topics --bootstrap-server %s --delete --topic old-topic
+- Consume messages: kafka-console-consumer --bootstrap-server %s --topic my-topic --from-beginning --max-messages 10
+- Produce a message: kafka-console-producer --bootstrap-server %s --topic my-topic
+- Describe configs: kafka-configs --bootstrap-server %s --describe --entity-type topics --entity-name my-topic
+
+Respond with a JSON object in this exact format, with no extra text or explanations.
+Use one of the following standardized intents: 'list_topics', 'describe_topic', 'create_topic', 'delete_topic', 'produce_message', 'consume_message', 'alter_configs', 'describe_configs', 'list_consumer_groups', 'describe_consumer_group', 'get_cluster_info'.
+{
+  "tool": "kafka",
+  "command": "kafka-topics --bootstrap-server %s --list",
+  "dry_run_command": "",
+  "description": "This command will list all topics in the Kafka cluster.",
+  "intent": "list_topics",
+  "confidence": 0.98,
+  "has_dry_run": false
+}
+
+If the user says "produce a message 'hello world' to topic 'test'", the command should be:
+"echo 'hello world' | kafka-console-producer --bootstrap-server %s --topic test"
+
+User Request: %s`, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, userInput)
+
+	response := callClaude(config, systemPrompt, userInput)
+	if response == "" {
+		return nil
+	}
+
+	var suggestion CommandSuggestion
+	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
+		fmt.Printf("⚠️  ops0: AI response parsing error: %v\n", err)
+		return nil
+	}
+
+	suggestion.AIGenerated = true
+	suggestion.Tool = "kafka" // Ensure tool is always set to kafka
+	return &suggestion
+}
+
+func displayKafkaStats(stats map[string]int) {
+	fmt.Println("\n📊 Kafka Admin Session Stats")
+	fmt.Println("══════════════════════════════")
+	if len(stats) == 0 {
+		fmt.Println("No operations performed yet in this session.")
+		fmt.Println()
+		return
+	}
+
+	total := 0
+	for _, count := range stats {
+		total += count
+	}
+	fmt.Printf("Total Operations: %d\n", total)
+	fmt.Println("Operation Breakdown:")
+
+	// Sort keys for consistent order
+	keys := make([]string, 0, len(stats))
+	for k := range stats {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, op := range keys {
+		fmt.Printf("  - %s: %d\n", op, stats[op])
+	}
+	fmt.Println()
+}
+
+// findCommand checks for a command in PATH, then in common locations.
+// It returns the full path to the command if found, and an error indicating status.
+// Error can be 'not_found' or 'found_not_in_path'. The path returned on 'found_not_in_path'
+// is the location where the command was found.
+func findCommand(cmd string) (string, error) {
+	// 1. Check PATH first. If found, we are good.
+	path, err := exec.LookPath(cmd)
+	if err == nil {
+		return path, nil
+	}
+
+	// 2. If not in PATH, check common alternative locations on macOS.
+	if runtime.GOOS == "darwin" {
+		commonPaths := []string{
+			"/opt/homebrew/bin", // Apple Silicon
+			"/usr/local/bin",    // Intel Macs
+		}
+		for _, p := range commonPaths {
+			fullPath := filepath.Join(p, cmd)
+			if _, err := os.Stat(fullPath); err == nil {
+				// Found it, but it wasn't in the system PATH.
+				return fullPath, fmt.Errorf("found_not_in_path")
+			}
+		}
+	}
+
+	// 3. Really not found.
+	return "", fmt.Errorf("not_found")
 }
