@@ -54,7 +54,7 @@ ops0 -o
 Here are some real-world examples of ops0 in action across different tools:
 
 ### Kafka Admin Mode
-[Watch a video of ops0's Kafka Admin Mode in action](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
+[![Kafka Admin Mode Video](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Example: Interactively manage Kafka clusters using natural language.*
 

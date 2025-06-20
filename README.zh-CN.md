@@ -52,7 +52,7 @@ ops0 -o
 以下是 ops0 在不同工具中的实际应用示例：
 
 ### Kafka 管理员模式
-[观看 ops0 Kafka 管理员模式操作视频](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
+[![Kafka 管理员模式视频](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *示例：使用自然语言交互式管理 Kafka 集群。*
 
