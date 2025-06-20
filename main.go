@@ -1999,7 +1999,7 @@ func runKafkaAdminSession(brokers string) {
 	testCmd := exec.Command(cmdPath, "--bootstrap-server", brokers, "--list")
 	testCmd.Stderr = os.Stderr
 	if err := testCmd.Run(); err != nil {
-		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and network connectivity."+reset+"\n", err)
+		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and network connectivity. Error: %v"+reset+"\n", err)
 		os.Exit(1)
 	}
 	fmt.Println(green + "✅ Connection successful." + reset)
@@ -2099,7 +2099,7 @@ Use one of the following standardized intents: 'list_topics', 'describe_topic', 
 If the user says "produce a message 'hello world' to topic 'test'", the command should be:
 "echo 'hello world' | kafka-console-producer --bootstrap-server %s --topic test"
 
-User Request: %s`, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, userInput)
+User Request: %s`, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, userInput)
 
 	response := callClaude(config, systemPrompt, userInput)
 	if response == "" {
