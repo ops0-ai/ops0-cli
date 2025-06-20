@@ -53,6 +53,7 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 
 ### Mode Administrateur Kafka
 [Regardez une vidéo du mode administrateur Kafka d'ops0 en action](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
+
 *Exemple : Gérez interactivement les clusters Kafka en utilisant le langage naturel.*
 
 ### Opérations AWS CLI
