@@ -243,7 +243,6 @@ func showHelp() {
 	fmt.Println("📋 Usage:")
 	fmt.Println("  ops0 -m \"your natural language command\"")
 	fmt.Println("  ops0 -o")
-	fmt.Println("  ops0 --admin kafka --brokers <broker_list>")
 	fmt.Println("  ops0 -m \"command\" -ai")
 	fmt.Println("  ops0 -m \"error description\" -troubleshoot")
 	fmt.Println("  ops0 -version")
@@ -258,8 +257,17 @@ func showHelp() {
 	fmt.Println("  -version     Show version information")
 	fmt.Println("  -help        Show this help message")
 	fmt.Println("  -install     Install all supported tools and display their versions")
-	fmt.Println("  --admin      Enter admin mode for a service (e.g., 'kafka')")
-	fmt.Println("  --brokers    Comma-separated list of Kafka brokers for admin mode")
+
+	// Admin Modes
+	fmt.Println("\n🔒 Admin Modes:")
+	fmt.Println("  Enter an interactive admin session for a specific service.")
+	fmt.Println("\n  Kafka Admin Mode:")
+	fmt.Println("    Usage: ops0 --admin kafka --brokers <broker_list>")
+	fmt.Println("    Flags:")
+	fmt.Println("      --admin kafka        Enter Kafka admin mode.")
+	fmt.Println("      --brokers <list>     Comma-separated list of Kafka brokers (required).")
+	fmt.Println("    Example:")
+	fmt.Println("      ops0 --admin kafka --brokers localhost:9092")
 
 	// Supported Tools
 	fmt.Println("\n🛠️  Supported Tools:")

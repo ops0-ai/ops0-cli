@@ -47,9 +47,13 @@ ops0 -o
 
 *使用 `ops0 -o` 进入交互式操作模式：输入自然语言请求，连续执行多项操作，直到输入 'quit' 或 'exit' 结束会话。*
 
-## 命令示例展示
+## 操作演示
 
 以下是 ops0 在不同工具中的实际应用示例：
+
+### Kafka 管理员模式
+[观看 ops0 Kafka 管理员模式操作视频](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
+*示例：使用自然语言交互式管理 Kafka 集群。*
 
 ### AWS CLI 操作
 ![AWS CLI Example](assets/aws.png)

@@ -49,9 +49,13 @@ ops0 -o
 
 *Nutzen Sie `ops0 -o` für den interaktiven Operationsmodus: Geben Sie natürliche Sprache ein und führen Sie mehrere Operationen in einer Sitzung aus, bis Sie 'quit' oder 'exit' eingeben.*
 
-## Befehlsbeispiele in Aktion
+## Operationen in Aktion
 
 Hier sind einige reale Beispiele von ops0 in verschiedenen Tools:
+
+### Kafka-Admin-Modus
+[Schauen Sie sich ein Video des Kafka-Admin-Modus von ops0 in Aktion an](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
+*Beispiel: Interaktive Verwaltung von Kafka-Clustern mit natürlicher Sprache.*
 
 ### AWS CLI-Operationen
 ![AWS CLI Example](assets/aws.png)
