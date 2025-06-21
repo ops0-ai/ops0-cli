@@ -15,7 +15,7 @@
   <a href="https://github.com/ops0-ai/ops0-cli/commits/main"><img src="https://img.shields.io/github/last-commit/ops0-ai/ops0-cli" alt="Last Commit"></a>
   <a href="https://github.com/ops0-ai/ops0-cli/releases"><img src="https://img.shields.io/github/v/release/ops0-ai/ops0-cli" alt="Latest Release"></a>
   <a href="https://github.com/ops0-ai/ops0-cli/stargazers"><img src="https://img.shields.io/github/stars/ops0-ai/ops0-cli" alt="GitHub Stars"></a>
-  <a href="https://discord.gg/4vnuq2WJrV"><img src="https://img.shields.io/discord/4vnuq2WJrV?logo=discord" alt="Discord"></a>
+  <a href="https://discord.gg/4vnuq2WJrV"><img src="https://img.shields.io/badge/Community-Discord-7289DA?logo=discord" alt="Discord"></a>
 </p>
 
 ---
