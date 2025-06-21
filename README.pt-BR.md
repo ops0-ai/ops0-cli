@@ -8,7 +8,7 @@
   <a href="./README.fr.md">ReadMe in French</a> • 
   <a href="./README.es.md">ReadMe in Spanish</a> • 
   ReadMe in Portuguese • 
-  <a href="https://join.slack.com/t/ops0/shared_invite/zt-37akwqb1v-BvfK7AioDlRhje94UN2tkw">Slack Community</a>
+  <a href="https://discord.gg/4vnuq2WJrV">Comunidade no Discord</a>
 </p>
 
 <p align="center">
