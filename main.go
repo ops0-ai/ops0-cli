@@ -99,6 +99,7 @@ func main() {
 	var interactiveMode bool
 	var adminMode string
 	var kafkaBrokers string
+	var kafkaCommandConfig string
 	
 	flag.BoolVar(&showVersion, "version", false, "show version information")
 	flag.BoolVar(&displayHelp, "help", false, "show help information")
@@ -110,6 +111,7 @@ func main() {
 	flag.BoolVar(&interactiveMode, "o", false, "operations interactive mode")
 	flag.StringVar(&adminMode, "admin", "", "enter admin mode for a specific service (e.g., 'kafka')")
 	flag.StringVar(&kafkaBrokers, "brokers", "", "comma-separated list of Kafka brokers for admin mode")
+	flag.StringVar(&kafkaCommandConfig, "command-config", "", "path to Kafka command config file for SSL/SASL")
 	flag.Parse()
 
 	if installAll {
@@ -124,7 +126,7 @@ func main() {
 				fmt.Println("❌ ops0: --brokers flag is required for Kafka admin mode")
 				os.Exit(1)
 			}
-			runKafkaAdminSession(kafkaBrokers)
+			runKafkaAdminSession(kafkaBrokers, kafkaCommandConfig)
 		default:
 			fmt.Printf("❌ ops0: Unknown admin mode '%s'. Supported modes: kafka\n", adminMode)
 			os.Exit(1)
@@ -264,10 +266,12 @@ func showHelp() {
 	fmt.Println("\n  Kafka Admin Mode:")
 	fmt.Println("    Usage: ops0 --admin kafka --brokers <broker_list>")
 	fmt.Println("    Flags:")
-	fmt.Println("      --admin kafka        Enter Kafka admin mode.")
-	fmt.Println("      --brokers <list>     Comma-separated list of Kafka brokers (required).")
+	fmt.Println("      --admin kafka              Enter Kafka admin mode.")
+	fmt.Println("      --brokers <list>           Comma-separated list of Kafka brokers (required).")
+	fmt.Println("      --command-config <path>    Path to client config file for SSL/SASL.")
 	fmt.Println("    Example:")
 	fmt.Println("      ops0 --admin kafka --brokers localhost:9092")
+	fmt.Println("      ops0 --admin kafka --brokers ssl-broker:9093 --command-config client.properties")
 
 	// Supported Tools
 	fmt.Println("\n🛠️  Supported Tools:")
@@ -1922,7 +1926,7 @@ func runInteractiveSession() {
 	}
 }
 
-func runKafkaAdminSession(brokers string) {
+func runKafkaAdminSession(brokers string, commandConfig string) {
 	// Prerequisite check for Homebrew on macOS
 	if runtime.GOOS == "darwin" {
 		if _, err := findCommand("brew"); err != nil {
@@ -1951,7 +1955,7 @@ func runKafkaAdminSession(brokers string) {
 		}
 	}
 
-	// 1. Check if kafka-topics.sh is available
+	// 1. Check if kafka-topics is available
 	cmdPath, err := findCommand("kafka-topics")
 	if err != nil {
 		if err.Error() == "found_not_in_path" {
@@ -1996,7 +2000,11 @@ func runKafkaAdminSession(brokers string) {
 
 	// 2. Test connection to the cluster
 	fmt.Printf("Connecting to Kafka cluster at %s...\n", brokers)
-	testCmd := exec.Command(cmdPath, "--bootstrap-server", brokers, "--list")
+	args := []string{"--bootstrap-server", brokers, "--list"}
+	if commandConfig != "" {
+		args = append(args, "--command-config", commandConfig)
+	}
+	testCmd := exec.Command(cmdPath, args...)
 	testCmd.Stderr = os.Stderr
 	if err := testCmd.Run(); err != nil {
 		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and network connectivity. Error: %v"+reset+"\n", err)
@@ -2032,7 +2040,7 @@ func runKafkaAdminSession(brokers string) {
 			continue
 		}
 
-		suggestion := getKafkaAISuggestion(claudeConfig, input, brokers)
+		suggestion := getKafkaAISuggestion(claudeConfig, input, brokers, commandConfig)
 
 		if suggestion != nil {
 			// Show operation details and prompt for confirmation
@@ -2069,26 +2077,31 @@ func runKafkaAdminSession(brokers string) {
 	}
 }
 
-func getKafkaAISuggestion(config *ClaudeConfig, userInput, brokers string) *CommandSuggestion {
+func getKafkaAISuggestion(config *ClaudeConfig, userInput, brokers, commandConfig string) *CommandSuggestion {
+	connectionFlags := fmt.Sprintf("--bootstrap-server %s", brokers)
+	if commandConfig != "" {
+		connectionFlags += fmt.Sprintf(" --command-config %s", commandConfig)
+	}
+
 	systemPrompt := fmt.Sprintf(`You are an expert Kafka administrator's assistant. Your sole job is to translate natural language user requests into the appropriate Kafka command-line tool command (e.g., kafka-topics, kafka-console-consumer, kafka-configs).
 
-The user is connected to the Kafka cluster at: %s
-**You must inject '--bootstrap-server %s' into every command you generate.** Do not use full paths for the kafka commands (e.g. use 'kafka-topics' not '/usr/local/bin/kafka-topics').
+The user is connected to a Kafka cluster.
+**You must inject '%s' into every command you generate.** Do not use full paths for the kafka commands (e.g. use 'kafka-topics' not '/usr/local/bin/kafka-topics').
 
 Here are some examples of Kafka commands:
-- List topics: kafka-topics --bootstrap-server %s --list
-- Describe a topic: kafka-topics --bootstrap-server %s --describe --topic my-topic
-- Create a topic: kafka-topics --bootstrap-server %s --create --topic new-topic --partitions 1 --replication-factor 1
-- Delete a topic: kafka-topics --bootstrap-server %s --delete --topic old-topic
-- Consume messages: kafka-console-consumer --bootstrap-server %s --topic my-topic --from-beginning --max-messages 10
-- Produce a message: kafka-console-producer --bootstrap-server %s --topic my-topic
-- Describe configs: kafka-configs --bootstrap-server %s --describe --entity-type topics --entity-name my-topic
+- List topics: kafka-topics %s --list
+- Describe a topic: kafka-topics %s --describe --topic my-topic
+- Create a topic: kafka-topics %s --create --topic new-topic --partitions 1 --replication-factor 1
+- Delete a topic: kafka-topics %s --delete --topic old-topic
+- Consume messages: kafka-console-consumer %s --topic my-topic --from-beginning --max-messages 10
+- Produce a message: kafka-console-producer %s --topic my-topic
+- Describe configs: kafka-configs %s --describe --entity-type topics --entity-name my-topic
 
 Respond with a JSON object in this exact format, with no extra text or explanations.
 Use one of the following standardized intents: 'list_topics', 'describe_topic', 'create_topic', 'delete_topic', 'produce_message', 'consume_message', 'alter_configs', 'describe_configs', 'list_consumer_groups', 'describe_consumer_group', 'get_cluster_info'.
 {
   "tool": "kafka",
-  "command": "kafka-topics --bootstrap-server %s --list",
+  "command": "kafka-topics %s --list",
   "dry_run_command": "",
   "description": "This command will list all topics in the Kafka cluster.",
   "intent": "list_topics",
@@ -2097,9 +2110,9 @@ Use one of the following standardized intents: 'list_topics', 'describe_topic', 
 }
 
 If the user says "produce a message 'hello world' to topic 'test'", the command should be:
-"echo 'hello world' | kafka-console-producer --bootstrap-server %s --topic test"
+"echo 'hello world' | kafka-console-producer %s --topic test"
 
-User Request: %s`, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, brokers, userInput)
+User Request: %s`, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, connectionFlags, userInput)
 
 	response := callClaude(config, systemPrompt, userInput)
 	if response == "" {
