@@ -34,8 +34,15 @@ and performing the right operations, making DevOps management more accessible an
 ## Quick Start
 
 ### Installation
+
+#### Using script
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
+```
+#### Manual compilation
+```bash
+export PATH=$PATH:<YOUR_GO_BINARY_PATH>
+go build -o ops0 .
 ```
 
 ### Basic Usage
@@ -46,6 +53,9 @@ ops0 -m "i want to plan my iac code"
 # AI-powered mode (requires API key)
 export ANTHROPIC_API_KEY=your_key_here
 ops0 -m "check if my kubernetes pods are running" -ai
+ops0 -m "Name of the directory where this cli is running? "
+ops0 -m "CPU and Memory information of the system where ops0 cli application is running? "
+
 
 # Troubleshooting mode
 ops0 -m "my terraform apply is failing with state lock" -troubleshoot
