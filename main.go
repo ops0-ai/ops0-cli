@@ -1,15 +1,13 @@
 package main
 
 import (
-	
+	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
-	"regexp"
-	"flag"
 )
-
 
 // Version information (set by GoReleaser or git)
 var (
