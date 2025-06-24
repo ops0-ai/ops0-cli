@@ -2,11 +2,7 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -365,85 +361,6 @@ func showHelp() {
 }
 
 
-
-func getAISuggestion(config *ClaudeConfig, userInput string) *CommandSuggestion {
-	systemPrompt := `You are ops0, an AI-powered DevOps CLI assistant. Your job is to translate natural language requests into specific DevOps commands.
-
-You support these tools: terraform, ansible, kubectl, docker, helm, aws-cli, gcloud, azure-cli, system_admin.
-
-For system monitoring and resource usage requests:
-- If the request mentions "device", "machine", "local", "my", or "system", use system_admin tool
-- Use system_admin for memory, CPU, disk usage, and system logs
-- Only use docker/k8s tools if explicitly mentioning containers or clusters
-
-Respond with a JSON object in this exact format:
-{
-  "tool": "system_admin",
-  "command": "free -h",
-  "dry_run_command": "",
-  "description": "This will show memory usage on your local machine",
-  "intent": "monitor local system resources",
-  "confidence": 0.95,
-  "has_dry_run": false
-}
-
-Rules:
-- Only suggest commands for tools that are commonly available
-- Prefer safe, read-only commands when possible
-- Include helpful descriptions
-- Set confidence between 0-1 based on how certain you are
-- For commands that modify state, provide a dry run command if available
-- If you can't understand the request, return null`
-
-	response := callClaude(config, systemPrompt, userInput)
-	if response == "" {
-		return nil
-	}
-
-	var suggestion CommandSuggestion
-	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
-		fmt.Printf("⚠️  ops0: AI response parsing error, falling back to rule-based parsing\n")
-		return nil
-	}
-
-	suggestion.AIGenerated = true
-	return &suggestion
-}
-
-func handleTroubleshooting(config *ClaudeConfig, problem string) *CommandSuggestion {
-	context := gatherSystemContext()
-	
-	systemPrompt := `You are ops0, an AI-powered DevOps troubleshooting assistant. The user is experiencing a problem and needs help.
-
-Analyze the problem and system context, then suggest the best diagnostic or fix command.
-
-Respond with a JSON object:
-{
-  "tool": "kubectl",
-  "command": "kubectl describe pods",
-  "description": "This will show detailed information about pod issues",
-  "intent": "diagnose pod problems",
-  "confidence": 0.9
-}
-
-Focus on diagnostic commands first and safe operations.`
-
-	prompt := fmt.Sprintf("Problem: %s\n\nSystem Context:\n%s", problem, context)
-	response := callClaude(config, systemPrompt, prompt)
-	
-	if response == "" {
-		return nil
-	}
-
-	var suggestion CommandSuggestion
-	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
-		return nil
-	}
-
-	suggestion.AIGenerated = true
-	return &suggestion
-}
-
 func gatherSystemContext() string {
 	var context strings.Builder
 	
@@ -477,66 +394,6 @@ func gatherSystemContext() string {
 	return context.String()
 }
 
-func callClaude(config *ClaudeConfig, systemPrompt, userMessage string) string {
-	request := ClaudeRequest{
-		Model:     config.Model,
-		MaxTokens: config.MaxTokens,
-		System:    systemPrompt,
-		Messages: []ClaudeMessage{
-			{
-				Role:    "user",
-				Content: userMessage,
-			},
-		},
-	}
-
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		fmt.Printf("⚠️  ops0: Error preparing AI request: %v\n", err)
-		return ""
-	}
-
-	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Printf("⚠️  ops0: Error creating AI request: %v\n", err)
-		return ""
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", config.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("⚠️  ops0: Error calling AI service: %v\n", err)
-		return ""
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("⚠️  ops0: Error reading AI response: %v\n", err)
-		return ""
-	}
-
-	if resp.StatusCode != 200 {
-		fmt.Printf("⚠️  ops0: AI service error (status %d): %s\n", resp.StatusCode, string(body))
-		return ""
-	}
-
-	var claudeResp ClaudeResponse
-	if err := json.Unmarshal(body, &claudeResp); err != nil {
-		fmt.Printf("⚠️  ops0: Error parsing AI response: %v\n", err)
-		return ""
-	}
-
-	if len(claudeResp.Content) > 0 {
-		return claudeResp.Content[0].Text
-	}
-
-	return ""
-}
 
 func isToolInstalled(tool string) bool {
 	cmd := exec.Command("which", tool)
@@ -590,7 +447,6 @@ func formatSection(title string, content []string) string {
 	
 	return output.String()
 }
-
 
 
 func getToolDisplayName(toolName string) string {
@@ -1179,21 +1035,6 @@ func isCommandAvailable(cmd string) bool {
 	return err == nil
 }
 
-func getClaudeConfigIfAvailable() *ClaudeConfig {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		return nil
-	}
-	model := os.Getenv("OPS0_AI_MODEL")
-	if model == "" {
-		model = "claude-3-5-sonnet-20241022"
-	}
-	return &ClaudeConfig{
-		APIKey:    apiKey,
-		Model:     model,
-		MaxTokens: 1024,
-	}
-}
 
 func simpleLogAnalysis(logs string) string {
 	lines := strings.Split(logs, "\n")

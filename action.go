@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"bufio"
 	"regexp"
@@ -367,4 +368,83 @@ func runInteractiveSession() {
 			fmt.Println("❌ Could not understand the operation.")
 		}
 	}
+}
+
+
+func getAISuggestion(config *ClaudeConfig, userInput string) *CommandSuggestion {
+	systemPrompt := `You are ops0, an AI-powered DevOps CLI assistant. Your job is to translate natural language requests into specific DevOps commands.
+
+You support these tools: terraform, ansible, kubectl, docker, helm, aws-cli, gcloud, azure-cli, system_admin.
+
+For system monitoring and resource usage requests:
+- If the request mentions "device", "machine", "local", "my", or "system", use system_admin tool
+- Use system_admin for memory, CPU, disk usage, and system logs
+- Only use docker/k8s tools if explicitly mentioning containers or clusters
+
+Respond with a JSON object in this exact format:
+{
+  "tool": "system_admin",
+  "command": "free -h",
+  "dry_run_command": "",
+  "description": "This will show memory usage on your local machine",
+  "intent": "monitor local system resources",
+  "confidence": 0.95,
+  "has_dry_run": false
+}
+
+Rules:
+- Only suggest commands for tools that are commonly available
+- Prefer safe, read-only commands when possible
+- Include helpful descriptions
+- Set confidence between 0-1 based on how certain you are
+- For commands that modify state, provide a dry run command if available
+- If you can't understand the request, return null`
+
+	response := callClaude(config, systemPrompt, userInput)
+	if response == "" {
+		return nil
+	}
+
+	var suggestion CommandSuggestion
+	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
+		fmt.Printf("⚠️  ops0: AI response parsing error, falling back to rule-based parsing\n")
+		return nil
+	}
+
+	suggestion.AIGenerated = true
+	return &suggestion
+}
+
+func handleTroubleshooting(config *ClaudeConfig, problem string) *CommandSuggestion {
+	context := gatherSystemContext()
+	
+	systemPrompt := `You are ops0, an AI-powered DevOps troubleshooting assistant. The user is experiencing a problem and needs help.
+
+Analyze the problem and system context, then suggest the best diagnostic or fix command.
+
+Respond with a JSON object:
+{
+  "tool": "kubectl",
+  "command": "kubectl describe pods",
+  "description": "This will show detailed information about pod issues",
+  "intent": "diagnose pod problems",
+  "confidence": 0.9
+}
+
+Focus on diagnostic commands first and safe operations.`
+
+	prompt := fmt.Sprintf("Problem: %s\n\nSystem Context:\n%s", problem, context)
+	response := callClaude(config, systemPrompt, prompt)
+	
+	if response == "" {
+		return nil
+	}
+
+	var suggestion CommandSuggestion
+	if err := json.Unmarshal([]byte(response), &suggestion); err != nil {
+		return nil
+	}
+
+	suggestion.AIGenerated = true
+	return &suggestion
 }
