@@ -157,3 +157,15 @@ func generateAnsibleProjectTemplate(userMsg string) (string, string, error) {
 `, group, host)
 	return playbook, inventory, nil
 }
+
+func findPlaybookFile() string {
+	candidates := []string{"playbook.yml", "site.yml", "main.yml", "deploy.yml"}
+	
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	
+	return ""
+}

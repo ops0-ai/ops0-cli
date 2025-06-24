@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"regexp"
 	"flag"
-	"time"
 )
 
 
@@ -295,73 +293,6 @@ func showHelp() {
 }
 
 
-func gatherSystemContext() string {
-	var context strings.Builder
-	
-	tools := []string{"terraform", "kubectl", "docker", "ansible", "helm", "aws", "gcloud", "az"}
-	context.WriteString("Available tools:\n")
-	
-	for _, tool := range tools {
-		if isToolInstalled(tool) {
-			if version := getToolVersion(tool); version != "" {
-				context.WriteString(fmt.Sprintf("- %s: %s\n", tool, version))
-			} else {
-				context.WriteString(fmt.Sprintf("- %s: installed\n", tool))
-			}
-		}
-	}
-	
-	context.WriteString("\nProject context:\n")
-	files := []string{"terraform.tf", "main.tf", "Dockerfile", "docker-compose.yml", 
-					 "kubernetes.yaml", "k8s.yaml", "playbook.yml", "ansible.yml"}
-	
-	for _, file := range files {
-		if _, err := os.Stat(file); err == nil {
-			context.WriteString(fmt.Sprintf("- Found: %s\n", file))
-		}
-	}
-	
-	if pwd, err := os.Getwd(); err == nil {
-		context.WriteString(fmt.Sprintf("- Working directory: %s\n", pwd))
-	}
-	
-	return context.String()
-}
-
-
-func isToolInstalled(tool string) bool {
-	cmd := exec.Command("which", tool)
-	return cmd.Run() == nil
-}
-
-func getToolVersion(tool string) string {
-	var cmd *exec.Cmd
-	switch tool {
-	case "terraform":
-		cmd = exec.Command("terraform", "version")
-	case "kubectl":
-		cmd = exec.Command("kubectl", "version", "--client", "--short")
-	case "docker":
-		cmd = exec.Command("docker", "--version")
-	case "ansible":
-		cmd = exec.Command("ansible", "--version")
-	default:
-		cmd = exec.Command(tool, "--version")
-	}
-	
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	
-	lines := strings.Split(string(output), "\n")
-	if len(lines) > 0 {
-		return strings.TrimSpace(lines[0])
-	}
-	
-	return ""
-}
-
 func formatSection(title string, content []string) string {
 	var output strings.Builder
 	
@@ -382,23 +313,6 @@ func formatSection(title string, content []string) string {
 	return output.String()
 }
 
-
-func getToolDisplayName(toolName string) string {
-	switch toolName {
-	case "aws", "aws-cli":
-		return "AWS CLI"
-	case "gcloud":
-		return "Google Cloud SDK"
-	case "az":
-		return "Azure CLI"
-	case "kubectl":
-		return "Kubernetes CLI"
-	case "kafka":
-		return "Apache Kafka"
-	default:
-		return strings.Title(toolName)
-	}
-}
 
 func getCommit() string {
 	if c := os.Getenv("COMMIT"); c != "" {
@@ -422,115 +336,6 @@ func getBuildDate() string {
 	return "unknown"
 }
 
-func checkToolInstalled(tool *Tool) bool {
-	cmd := exec.Command("sh", "-c", tool.CheckCmd+" > /dev/null 2>&1")
-	return cmd.Run() == nil
-}
-
-func getInstallCommand(toolName string) string {
-	switch toolName {
-	case "terraform":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install terraform"
-			}
-			return "brew install terraform"
-		}
-		return "curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add - && sudo apt-add-repository \"deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main\" && sudo apt-get update && sudo apt-get install terraform"
-	case "ansible":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install ansible"
-			}
-			return "brew install ansible"
-		}
-		return "sudo apt-get update && sudo apt-get install ansible"
-	case "kubectl":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install kubectl"
-			}
-			return "brew install kubectl"
-		}
-		return "curl -LO \"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl"
-	case "docker":
-		if runtime.GOOS == "darwin" {
-			return "echo 'Please install Docker Desktop from https://www.docker.com/products/docker-desktop/' && open 'https://www.docker.com/products/docker-desktop/'"
-		}
-		return "curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh"
-	case "helm":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install helm"
-			}
-			return "brew install helm"
-		}
-		return "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
-	case "aws":
-		if runtime.GOOS == "darwin" {
-			// Use direct installer for macOS to avoid Homebrew architecture issues
-			if runtime.GOARCH == "arm64" {
-				return "curl \"https://awscli.amazonaws.com/AWSCLIV2-arm64.pkg\" -o \"AWSCLIV2.pkg\" && sudo installer -pkg AWSCLIV2.pkg -target /"
-			}
-			return "curl \"https://awscli.amazonaws.com/AWSCLIV2.pkg\" -o \"AWSCLIV2.pkg\" && sudo installer -pkg AWSCLIV2.pkg -target /"
-		}
-		return "curl \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\" && unzip awscliv2.zip && sudo ./aws/install"
-	case "gcloud":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install google-cloud-sdk"
-			}
-			return "brew install google-cloud-sdk"
-		}
-		return "curl https://sdk.cloud.google.com | bash && exec -l $SHELL"
-	case "az":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install azure-cli"
-			}
-			return "brew install azure-cli"
-		}
-		return "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash"
-	case "kafka":
-		if runtime.GOOS == "darwin" {
-			if runtime.GOARCH == "arm64" {
-				return "arch -arm64 brew install kafka"
-			}
-			return "brew install kafka"
-		}
-		// For Linux, download from Apache, extract, and symlink binaries
-		return "echo 'Downloading and installing Apache Kafka...' && KAFKA_VERSION=\"3.7.0\" && SCALA_VERSION=\"2.13\" && curl -L \"https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz\" -o kafka.tgz && tar -xzf kafka.tgz && sudo mv kafka_${SCALA_VERSION}-${KAFKA_VERSION} /usr/local/kafka && sudo ln -s /usr/local/kafka/bin/* /usr/local/bin/ && rm kafka.tgz && echo 'Kafka installed to /usr/local/kafka. Binaries symlinked to /usr/local/bin.'"
-	default:
-		return ""
-	}
-}
-
-func installTool(tool *Tool) bool {
-	if tool.InstallCmd == "" {
-		fmt.Printf("❌ ops0: Don't know how to install %s on this system.\n", tool.Name)
-		fmt.Printf("🔍 Debug: Tool name = '%s', OS = %s\n", tool.Name, runtime.GOOS)
-		return false
-	}
-	
-	fmt.Printf("🔧 ops0: Installing %s...\n", tool.Name)
-	cmd := exec.Command("sh", "-c", tool.InstallCmd)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	
-	return cmd.Run() == nil
-}
-
-func findPlaybookFile() string {
-	candidates := []string{"playbook.yml", "site.yml", "main.yml", "deploy.yml"}
-	
-	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-	}
-	
-	return ""
-}
 
 func getUserConfirmation() bool {
 	reader := bufio.NewReader(os.Stdin)
@@ -540,175 +345,7 @@ func getUserConfirmation() bool {
 	return response == "y" || response == "yes"
 }
 
-// Log every executed command to ~/.ops0-cli-stats.log
-func logCommandStat(tool, command string) {
-	usr, err := user.Current()
-	username := "unknown"
-	if err == nil {
-		username = usr.Username
-	}
-	fmt.Fprintf(os.Stderr, "LOGGING: %s %s %s\n", username, tool, command)
-	home := os.Getenv("HOME")
-	if home == "" && err == nil {
-		home = usr.HomeDir
-	}
-	if home == "" {
-		fmt.Fprintln(os.Stderr, "Could not determine home directory for stats logging.")
-		return
-	}
-	logPath := home + "/.ops0-cli-stats.log"
-	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not open stats log file: %v\n", err)
-		return
-	}
-	defer f.Close()
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	line := fmt.Sprintf("%s|%s|%s|%s\n", timestamp, username, tool, command)
-	f.WriteString(line)
-}
 
-// Show stats from ~/.ops0-cli-stats.log
-func showCommandStats() {
-	usr, err := user.Current()
-	home := os.Getenv("HOME")
-	if home == "" && err == nil {
-		home = usr.HomeDir
-	}
-	if home == "" {
-		fmt.Println("Could not determine user home directory.")
-		return
-	}
-	logPath := home + "/.ops0-cli-stats.log"
-	f, err := os.Open(logPath)
-	if err != nil {
-		fmt.Println("No command stats found yet. Run some commands first!")
-		return
-	}
-	defer f.Close()
-
-	total := 0
-	toolCounts := make(map[string]int)
-	var lastUsed string
-	var mostUsedTool string
-	maxCount := 0
-	commandCounts := make(map[string]int)
-	operationCounts := make(map[string]map[string]int) // tool -> op -> count
-	userSet := make(map[string]struct{})
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		parts := strings.SplitN(scanner.Text(), "|", 4)
-		if len(parts) != 4 {
-			continue
-		}
-		total++
-		ts, user, tool, command := parts[0], parts[1], parts[2], parts[3]
-		userSet[user] = struct{}{}
-		toolCounts[tool]++
-		lastUsed = ts
-		commandCounts[command]++
-		if toolCounts[tool] > maxCount {
-			maxCount = toolCounts[tool]
-			mostUsedTool = tool
-		}
-		// Operation classification
-		if _, ok := operationCounts[tool]; !ok {
-			operationCounts[tool] = make(map[string]int)
-		}
-		var op string
-		switch tool {
-		case "ansible":
-			if strings.Contains(command, "playbook") {
-				op = "run playbook"
-			} else {
-				op = "ad-hoc command"
-			}
-		case "kubectl":
-			if strings.Contains(command, "get pods") {
-				op = "get pods"
-			} else if strings.Contains(command, "apply") {
-				op = "apply"
-			} else if strings.Contains(command, "delete") {
-				op = "delete"
-			} else {
-				op = "other"
-			}
-		case "terraform":
-			if strings.Contains(command, "plan") {
-				op = "plan"
-			} else if strings.Contains(command, "apply") {
-				op = "apply"
-			} else if strings.Contains(command, "destroy") {
-				op = "destroy"
-			} else {
-				op = "other"
-			}
-		case "docker":
-			if strings.Contains(command, "ps") {
-				op = "ps"
-			} else if strings.Contains(command, "build") {
-				op = "build"
-			} else if strings.Contains(command, "images") {
-				op = "images"
-			} else {
-				op = "other"
-			}
-		case "aws":
-			if strings.Contains(command, "ec2") {
-				op = "ec2"
-			} else if strings.Contains(command, "s3") {
-				op = "s3"
-			} else {
-				op = "other"
-			}
-		default:
-			op = "other"
-		}
-		operationCounts[tool][op]++
-	}
-	if total == 0 {
-		fmt.Println("No command stats found yet. Run some commands first!")
-		return
-	}
-	fmt.Println("\n📊 ops0 Command Usage Stats")
-	fmt.Println("══════════════════════════")
-	fmt.Printf("User(s): %s\n", strings.Join(mapKeys(userSet), ", "))
-	fmt.Printf("Total Commands Run: %d\n", total)
-	fmt.Println("Per-Tool Usage:")
-	for tool, count := range toolCounts {
-		fmt.Printf("  %s: %d\n", tool, count)
-	}
-	fmt.Printf("Most Used Tool: %s (%d times)\n", mostUsedTool, maxCount)
-	fmt.Printf("Last Used: %s\n", lastUsed)
-	fmt.Println("\nOperation Types per Tool:")
-	for tool, ops := range operationCounts {
-		fmt.Printf("  %s:\n", tool)
-		for op, count := range ops {
-			fmt.Printf("    %s: %d\n", op, count)
-		}
-	}
-	fmt.Println("\nTop 10 Commands:")
-	topCmds := topNCommands(commandCounts, 10)
-	for i, pair := range topCmds {
-		fmt.Printf("  %d. %s (%d times)\n", i+1, pair.cmd, pair.count)
-	}
-}
-
-
-func topNCommands(m map[string]int, n int) []cmdCount {
-	var arr []cmdCount
-	for k, v := range m {
-		arr = append(arr, cmdCount{k, v})
-	}
-	sort.Slice(arr, func(i, j int) bool {
-		return arr[i].count > arr[j].count
-	})
-	if len(arr) > n {
-		return arr[:n]
-	}
-	return arr
-}
 
 func mapKeys(m map[string]struct{}) []string {
 	var keys []string
@@ -718,8 +355,6 @@ func mapKeys(m map[string]struct{}) []string {
 	sort.Strings(keys)
 	return keys
 }
-
-
 
 func extractIP(s string) string {
 	re := regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
@@ -852,44 +487,6 @@ func simpleLogAnalysis(logs string) string {
 	b.WriteString("\nRecommendation: Investigate the above issues.\n")
 	return b.String()
 }
-
-func installAllTools() {
-	tools := []string{"terraform", "ansible", "kubectl", "docker", "helm", "aws", "gcloud", "az"}
-	fmt.Println("🔧 Installing all supported tools...")
-	for _, name := range tools {
-		tool := &Tool{
-			Name:       name,
-			CheckCmd:   name + " --version",
-			InstallCmd: getInstallCommand(name),
-		}
-		if checkToolInstalled(tool) {
-			fmt.Printf("✅ %s is already installed.\n", getToolDisplayName(name))
-			continue
-		}
-		fmt.Printf("🔧 Installing %s...\n", getToolDisplayName(name))
-		if installTool(tool) {
-			fmt.Printf("✅ %s installed successfully!\n", getToolDisplayName(name))
-		} else {
-			fmt.Printf("❌ Failed to install %s. Please install it manually.\n", getToolDisplayName(name))
-		}
-	}
-	fmt.Println("🎉 All tools processed.")
-
-	// Display table of installed tools and versions
-	fmt.Println("\n📦 Installed Tools:")
-	fmt.Println("────────────────────────────────────────────")
-	fmt.Printf("%-18s | %-20s\n", "Tool", "Version")
-	fmt.Println(strings.Repeat("-", 42))
-	for _, name := range tools {
-		ver := getToolVersion(name)
-		if ver == "" {
-			ver = "Not installed"
-		}
-		fmt.Printf("%-18s | %-20s\n", getToolDisplayName(name), ver)
-	}
-	fmt.Println(strings.Repeat("-", 42))
-}
-
 
 // findCommand checks for a command in PATH, then in common locations.
 // It returns the full path to the command if found, and an error indicating status.
