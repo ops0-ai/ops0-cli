@@ -218,7 +218,16 @@ func findCommand(cmd string) (string, error) {
 		return path, nil
 	}
 
-	// 2. If not in PATH, check common alternative locations on macOS.
+	// 2. For Kafka commands, also check with .sh suffix on Linux
+	if runtime.GOOS == "linux" && strings.HasPrefix(cmd, "kafka-") {
+		cmdWithSh := cmd + ".sh"
+		path, err := exec.LookPath(cmdWithSh)
+		if err == nil {
+			return path, nil
+		}
+	}
+
+	// 3. If not in PATH, check common alternative locations on macOS.
 	if runtime.GOOS == "darwin" {
 		commonPaths := []string{
 			"/opt/homebrew/bin", // Apple Silicon
@@ -233,6 +242,6 @@ func findCommand(cmd string) (string, error) {
 		}
 	}
 
-	// 3. Really not found.
+	// 4. Really not found.
 	return "", fmt.Errorf("not_found")
 }
