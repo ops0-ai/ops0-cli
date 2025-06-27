@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 #### Manual compilation
 ```bash
 export PATH=$PATH:<YOUR_GO_BINARY_PATH>
-go build -o ops0 .
+go build -o ops0 ./src/...
 ```
 
 ### Basic Usage

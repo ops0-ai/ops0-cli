@@ -16,7 +16,7 @@ builds:
     goarch:
       - amd64
       - arm64
-    main: .
+    main: ./src
     binary: ops0
     ldflags:
       - -s -w

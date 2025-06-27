@@ -25,7 +25,7 @@ jobs:
           go-version: '1.21'
 
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v ./src/...
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
@@ -68,14 +68,14 @@ jobs:
       run: go mod download
 
     - name: Run tests
-      run: go test -v ./...
+      run: go test -v ./src/...
 
     - name: Build
-      run: go build -v ./...
+      run: go build -v ./src/...
 
     - name: Test CLI execution
       run: |
-        go build -o ops0 .
+        go build -o ops0 ./src/...
         # Test that the binary runs (will show usage since no args)
         ./ops0 || true  # Allow failure since we expect usage error
 
