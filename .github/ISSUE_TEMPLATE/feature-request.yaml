@@ -1,0 +1,43 @@
+name: "Feature Request"
+description: Suggest a feature for ops0
+labels: ["✏️ Feature"]
+
+body:
+  - type: dropdown
+    id: affected-packages
+    attributes:
+      label: Which ops0 functionalities are relevant/related to the feature request?
+      options:
+        - operations
+        - kafka
+        - aws
+        - azure
+        - gcloud
+        - kubernetes
+        - system admin
+        - ansible
+        - terraform
+        - helm
+        - other
+      multiple: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives-considered
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
