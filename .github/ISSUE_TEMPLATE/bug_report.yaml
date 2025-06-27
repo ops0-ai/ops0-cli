@@ -1,0 +1,59 @@
+name: Bug Report
+description: Report a bug in ops0
+labels: ["☢️ Bug"]
+
+body:
+  - type: dropdown
+    id: affected-functionalities
+    attributes:
+      label: Which ops0-cli features are the source of the bug?
+      options:
+        - operations
+        - kafka
+        - aws
+        - azure
+        - gcloud
+        - kubernetes
+        - system admin
+        - ansible
+        - terraform
+        - helm
+        - Don't known / other
+      multiple: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+
+  - type: input
+    id: reproduction
+    attributes:
+      label: Please provide a link to a minimal reproduction of the bug
+
+  - type: textarea
+    id: exception-or-error
+    attributes:
+      label: Please provide the exception or error you saw
+      render: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Please provide the version you discovered this bug in (ops0 --version)
+      render: true
+      placeholder: |
+        ops0 version 0.5.1
+        commit: df8f4dd
+        built: unknown
+        go version: go1.21.13
+        platform: darwin/arm64
+
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?

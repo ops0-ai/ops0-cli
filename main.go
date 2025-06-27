@@ -12,8 +12,8 @@ import (
 // Version information (set by GoReleaser or git)
 var (
 	version = "v0.1.0"
-	commit  = getCommit()
-	date    = getBuildDate()
+	commit  = "none"
+	date    = "unknown"
 )
 
 
