@@ -218,26 +218,45 @@ func findCommand(cmd string) (string, error) {
 		return path, nil
 	}
 
-	// 2. For Kafka commands, also check with .sh suffix on Linux
+	// 2. For Kafka commands on Linux, also check with .sh suffix via PATH
+	var cmdWithSh string
 	if runtime.GOOS == "linux" && strings.HasPrefix(cmd, "kafka-") {
-		cmdWithSh := cmd + ".sh"
+		cmdWithSh = cmd + ".sh"
 		path, err := exec.LookPath(cmdWithSh)
 		if err == nil {
 			return path, nil
 		}
 	}
 
-	// 3. If not in PATH, check common alternative locations on macOS.
+	// 3. If not in PATH, check common alternative locations.
+	var commonPaths []string
 	if runtime.GOOS == "darwin" {
-		commonPaths := []string{
+		commonPaths = []string{
 			"/opt/homebrew/bin", // Apple Silicon
 			"/usr/local/bin",    // Intel Macs
 		}
-		for _, p := range commonPaths {
-			fullPath := filepath.Join(p, cmd)
-			if _, err := os.Stat(fullPath); err == nil {
-				// Found it, but it wasn't in the system PATH.
+	} else if runtime.GOOS == "linux" {
+		// General paths, avoiding user-specific ones.
+		commonPaths = []string{
+			"/opt/kafka/bin",
+			"/usr/local/kafka/bin",
+		}
+	}
+
+	for _, p := range commonPaths {
+		// Check for command without suffix
+		fullPath := filepath.Join(p, cmd)
+		if _, err := os.Stat(fullPath); err == nil {
+			if runtime.GOOS == "darwin" {
 				return fullPath, fmt.Errorf("found_not_in_path")
+			}
+			return fullPath, nil
+		}
+		// For Linux, also check with .sh for kafka commands in these paths
+		if runtime.GOOS == "linux" && cmdWithSh != "" {
+			fullPathSh := filepath.Join(p, cmdWithSh)
+			if _, err := os.Stat(fullPathSh); err == nil {
+				return fullPathSh, nil
 			}
 		}
 	}

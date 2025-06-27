@@ -41,6 +41,11 @@ func runKafkaAdminSession(brokers string, commandConfig string) {
 		}
 	}
 
+	if !isToolInstalled("brew") && runtime.GOOS == "darwin" {
+		fmt.Println(red + "❌ Homebrew is not installed. Please install it to use this feature." + reset)
+		os.Exit(1)
+	}
+
 	// 1. Check if kafka-topics is available
 	cmdPath, err := findCommand("kafka-topics")
 	if err != nil {
@@ -62,8 +67,34 @@ func runKafkaAdminSession(brokers string, commandConfig string) {
 
 			fmt.Println("\n   Run this command, then " + bold + "restart your terminal" + reset + ":")
 			fmt.Printf(bold+"   echo 'export PATH=\"%s:$PATH\"' >> %s"+reset+"\n\n", brewPath, profileFile)
-		} else { // "not_found"
-			fmt.Println(red + "❌ Kafka command-line tools not found." + reset)
+			os.Exit(1)
+		}
+
+		// "not_found"
+		fmt.Println(red + "❌ Kafka command-line tools not found in your PATH." + reset)
+		fmt.Print("Do you have Kafka installed in a custom location? (y/n): ")
+		if getUserConfirmation() {
+			fmt.Print("Please enter the full path to your Kafka 'bin' directory: ")
+			reader := bufio.NewReader(os.Stdin)
+			providedPath, _ := reader.ReadString('\n')
+			providedPath = strings.TrimSpace(providedPath)
+
+			// Validate the provided path
+			pathWithSh := filepath.Join(providedPath, "kafka-topics.sh")
+			pathWithoutSh := filepath.Join(providedPath, "kafka-topics")
+
+			if _, statErr := os.Stat(pathWithSh); statErr == nil {
+				cmdPath = pathWithSh
+			} else if _, statErr := os.Stat(pathWithoutSh); statErr == nil {
+				cmdPath = pathWithoutSh
+			} else {
+				fmt.Printf(red+"❌ Could not find Kafka tools in the provided path: %s"+reset+"\n", providedPath)
+				cmdPath = "" // Ensure cmdPath is empty to fall through to installation
+			}
+		}
+
+		// If path wasn't found or user didn't provide one, ask to install.
+		if cmdPath == "" {
 			fmt.Print("Would you like to try and install Kafka now? (y/n): ")
 			if getUserConfirmation() {
 				kafkaTool := &Tool{
@@ -80,8 +111,8 @@ func runKafkaAdminSession(brokers string, commandConfig string) {
 			} else {
 				fmt.Println("   Exiting. Please install Kafka and ensure its 'bin' directory is in your system's PATH.")
 			}
+			os.Exit(1)
 		}
-		os.Exit(1)
 	}
 
 	// 2. Test connection to the cluster
@@ -91,11 +122,16 @@ func runKafkaAdminSession(brokers string, commandConfig string) {
 		args = append(args, "--command-config", commandConfig)
 	}
 	testCmd := exec.Command(cmdPath, args...)
-	testCmd.Stderr = os.Stderr
-	if err := testCmd.Run(); err != nil {
-		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and network connectivity. Error: %v"+reset+"\n", err)
+	output, err := testCmd.CombinedOutput()
+
+	if err != nil {
+		fmt.Printf(red+"❌ Could not connect to Kafka cluster. Please check your broker addresses and configuration."+reset+"\n\n")
+		fmt.Println(bold + "Error details from Kafka tools:" + reset)
+		// Print the captured output which contains the detailed Java error
+		fmt.Println(string(output))
 		os.Exit(1)
 	}
+
 	fmt.Println(green + "✅ Connection successful." + reset)
 
 	// 3. Setup interactive session
@@ -140,15 +176,25 @@ func runKafkaAdminSession(brokers string, commandConfig string) {
 			confirm = strings.TrimSpace(strings.ToLower(confirm))
 
 			if confirm == "y" || confirm == "yes" {
-				// Prepend full path to the executable part of the command string
+				// Replace the command with the correct path using the pattern from cmdPath
 				parts := strings.Fields(suggestion.Command)
-				if len(parts) > 0 && !strings.Contains(parts[0], "/") {
+				if len(parts) > 0 {
 					baseCmd := parts[0]
-					// Find the full path to the base command
-					fullCmdPath, findErr := findCommand(baseCmd)
-					if findErr == nil {
-						suggestion.Command = strings.Replace(suggestion.Command, baseCmd, fullCmdPath, 1)
+					// Extract the command name without any path or suffix
+					cmdName := strings.TrimSuffix(filepath.Base(baseCmd), ".sh")
+					
+					// Use the same pattern as our detected cmdPath
+					// If cmdPath ends with .sh, use that pattern; otherwise use without .sh
+					var replacementCmd string
+					if strings.HasSuffix(cmdPath, ".sh") {
+						// Use .sh pattern
+						replacementCmd = strings.Replace(cmdPath, "kafka-topics.sh", cmdName+".sh", 1)
+					} else {
+						// Use without .sh pattern
+						replacementCmd = strings.Replace(cmdPath, "kafka-topics", cmdName, 1)
 					}
+					
+					suggestion.Command = strings.Replace(suggestion.Command, baseCmd, replacementCmd, 1)
 				}
 				if suggestion.Intent != "" {
 					kafkaStats[suggestion.Intent]++
