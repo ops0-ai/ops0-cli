@@ -47,11 +47,11 @@ body:
       label: Please provide the version you discovered this bug in (ops0 --version)
       render: true
       placeholder: |
-        ops0 version 0.5.1
-        commit: df8f4dd
-        built: unknown
+        ops0 version 0.5.3
+        commit: ffc6f23652092689526a5487c9974a8dcb429d85
+        built: 2025-06-27T05:44:02Z
         go version: go1.21.13
-        platform: darwin/arm64
+        platform: linux/amd64
 
   - type: textarea
     id: other
