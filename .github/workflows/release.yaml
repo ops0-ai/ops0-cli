@@ -75,7 +75,7 @@ jobs:
 
     - name: Test CLI execution
       run: |
-        go build -o ops0 main.go
+        go build -o ops0 .
         # Test that the binary runs (will show usage since no args)
         ./ops0 || true  # Allow failure since we expect usage error
 
