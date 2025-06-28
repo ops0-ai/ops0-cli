@@ -172,6 +172,11 @@ func showHelp() {
 	fmt.Println("  ops0 -version")
 	fmt.Println("  ops0 -help")
 
+	// Interactive Mode Demo
+	fmt.Println("\n🎯 Interactive Mode:")
+	fmt.Println("  Simply run 'ops0' to enter interactive mode and start chatting!")
+	fmt.Println("  See the demo: assets/ops0-intro-cli.png")
+
 	// Flags
 	fmt.Println("\n🚩 Flags:")
 	fmt.Println("  -m           Natural language command message")
