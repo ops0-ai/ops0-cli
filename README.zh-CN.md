@@ -38,6 +38,9 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 
 ### 基本用法
 ```bash
+# 交互模式 (默认) - 直接运行 ops0！
+ops0
+
 # 规则模式 (无需 API 密钥)
 ops0 -m "我想规划我的基础设施代码"
 
@@ -47,12 +50,9 @@ ops0 -m "检查我的 kubernetes pods 是否在运行" -ai
 
 # 故障排除模式
 ops0 -m "我的 terraform apply 因 state lock 失败" -troubleshoot
-
-# 交互式操作模式
-ops0 -o
 ```
 
-*使用 `ops0 -o` 进入交互式操作模式：输入自然语言请求，连续执行多项操作，直到输入 'quit' 或 'exit' 结束会话。*
+*直接运行 `ops0` 进入交互模式，开始用自然语言聊天！*
 
 ## 操作演示
 
@@ -62,6 +62,11 @@ ops0 -o
 [![Kafka 管理员模式视频](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *示例：使用自然语言交互式管理 Kafka 集群。*
+
+## 交互模式
+
+![ops0 交互模式](assets/ops0-intro-cli.png)
+*运行 'ops0' 进入交互模式，开始用自然语言命令聊天*
 
 ### AWS CLI 操作
 ![AWS CLI Example](assets/aws.png)

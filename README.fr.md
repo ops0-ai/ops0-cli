@@ -38,6 +38,9 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 
 ### Utilisation de Base
 ```bash
+# Mode interactif (par défaut) - lancez simplement ops0 !
+ops0
+
 # Mode basé sur des règles (pas de clé API nécessaire)
 ops0 -m "je veux planifier mon code IaC"
 
@@ -47,12 +50,9 @@ ops0 -m "vérifier si mes pods kubernetes fonctionnent" -ai
 
 # Mode dépannage
 ops0 -m "mon terraform apply échoue à cause d'un state lock" -troubleshoot
-
-# Mode opérations interactives
-ops0 -o
 ```
 
-*Utilisez `ops0 -o` pour le mode opérations interactives : saisissez des requêtes en langage naturel et exécutez plusieurs opérations dans une session jusqu'à taper 'quit' ou 'exit'.*
+*Lancez simplement `ops0` pour entrer en mode interactif et commencer à discuter avec des requêtes en langage naturel !*
 
 ## Opérations en Action
 
@@ -62,6 +62,11 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 [![Vidéo du Mode Administrateur Kafka](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Exemple : Gérez interactivement les clusters Kafka en utilisant le langage naturel.*
+
+## Mode Interactif
+
+![ops0 Mode Interactif](assets/ops0-intro-cli.png)
+*Entrez en mode interactif en lançant 'ops0' et commencez à discuter avec des commandes en langage naturel*
 
 ### Opérations AWS CLI
 ![AWS CLI Example](assets/aws.png)
@@ -88,7 +93,7 @@ Voici des exemples concrets d'ops0 en action avec différents outils :
 
 ![CLI Installer Tous les Outils](assets/cli-install.png)
 
-Vous pouvez désormais installer tous les outils DevOps supportés avec une seule commande :
+Vous pouvez désormais installer tous les outils DevOps supportés avec une seule commande :
 
 ```bash
 ops0 --install

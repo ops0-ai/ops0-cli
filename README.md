@@ -47,6 +47,9 @@ go build -o ops0 ./src/...
 
 ### Basic Usage
 ```bash
+# Interactive mode (default) - just run ops0!
+ops0
+
 # Rule-based mode (works without API key)
 ops0 -m "i want to plan my iac code"
 
@@ -59,12 +62,9 @@ ops0 -m "CPU and Memory information of the system where ops0 cli application is 
 
 # Troubleshooting mode
 ops0 -m "my terraform apply is failing with state lock" -troubleshoot
-
-# Interactive operations mode
-ops0 -o
 ```
 
-*Use `ops0 -o` for interactive operations mode: enter natural language requests and run multiple operations in a session until you type 'quit' or 'exit'.*
+*Simply run `ops0` to enter interactive mode and start chatting with natural language requests!*
 
 ## Operations in Action
 
@@ -74,6 +74,11 @@ Here are some real-world examples of ops0 in action across different tools:
 [![Kafka Admin Mode Video](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Example: Interactively manage Kafka clusters using natural language.*
+
+## Interactive Mode
+
+![ops0 Interactive Mode](assets/ops0-intro-cli.png)
+*Enter interactive mode by running 'ops0' and start chatting with natural language commands*
 
 ### ops0 statistics
 <img width="1022" alt="image" src="https://github.com/user-attachments/assets/000b01a3-6565-432d-96f1-cd64d912475c" />

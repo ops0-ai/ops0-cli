@@ -31,7 +31,6 @@ e gerando os comandos corretos, tornando o gerenciamento DevOps mais acessível 
 ![ops0 CLI Demo](assets/ops0cli.gif)
 *Veja o ops0 traduzir linguagem natural em poderosos operações DevOps*
 
-
 ### Instalação
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
@@ -39,6 +38,9 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 
 ### Uso Básico
 ```bash
+# Modo interativo (padrão) - simplesmente execute ops0!
+ops0
+
 # Modo baseado em regras (não requer chave API)
 ops0 -m "quero planejar meu código IaC"
 
@@ -48,12 +50,9 @@ ops0 -m "verifique se meus pods do kubernetes estão rodando" -ai
 
 # Modo de solução de problemas
 ops0 -m "meu terraform apply está falhando com state lock" -troubleshoot
-
-# Modo de operações interativas
-ops0 -o
 ```
 
-*Use `ops0 -o` para o modo de operações interativas: digite solicitações em linguagem natural e execute várias operações em uma sessão até digitar 'quit' ou 'exit'.*
+*Simplesmente execute `ops0` para entrar no modo interativo e começar a conversar com solicitações em linguagem natural!*
 
 ## Operações em Ação
 
@@ -63,6 +62,11 @@ Aqui estão alguns exemplos reais do ops0 em ação com diferentes ferramentas:
 [![Vídeo do Modo de Administração do Kafka](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Exemplo: Gerencie interativamente clusters Kafka usando linguagem natural.*
+
+## Modo Interativo
+
+![ops0 Modo Interativo](assets/ops0-intro-cli.png)
+*Entre no modo interativo executando 'ops0' e comece a conversar com comandos em linguagem natural*
 
 ### Operações AWS CLI
 ![AWS CLI Example](assets/aws.png)

@@ -40,6 +40,9 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 
 ### Grundlegende Verwendung
 ```bash
+# Interaktiver Modus (Standard) - führen Sie einfach ops0 aus!
+ops0
+
 # Regelbasierter Modus (kein API-Schlüssel erforderlich)
 ops0 -m "ich möchte meinen IaC-Code planen"
 
@@ -49,12 +52,9 @@ ops0 -m "prüfe, ob meine kubernetes pods laufen" -ai
 
 # Fehlerbehebungsmodus
 ops0 -m "mein terraform apply schlägt wegen state lock fehl" -troubleshoot
-
-# Interaktiver Operationsmodus
-ops0 -o
 ```
 
-*Nutzen Sie `ops0 -o` für den interaktiven Operationsmodus: Geben Sie natürliche Sprache ein und führen Sie mehrere Operationen in einer Sitzung aus, bis Sie 'quit' oder 'exit' eingeben.*
+*Führen Sie einfach `ops0` aus, um in den interaktiven Modus zu wechseln und mit natürlichsprachlichen Anfragen zu beginnen!*
 
 ## Operationen in Aktion
 
@@ -64,6 +64,11 @@ Hier sind einige reale Beispiele von ops0 in verschiedenen Tools:
 [![Kafka-Admin-Modus Video](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Beispiel: Interaktive Verwaltung von Kafka-Clustern mit natürlicher Sprache.*
+
+## Interaktiver Modus
+
+![ops0 Interaktiver Modus](assets/ops0-intro-cli.png)
+*Wechseln Sie in den interaktiven Modus, indem Sie 'ops0' ausführen und beginnen Sie mit natürlichsprachlichen Befehlen zu chatten*
 
 ### AWS CLI-Operationen
 ![AWS CLI Example](assets/aws.png)

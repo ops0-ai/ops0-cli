@@ -38,6 +38,9 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 
 ### Uso Básico
 ```bash
+# Modo interactivo (por defecto) - ¡simplemente ejecuta ops0!
+ops0
+
 # Modo basado en reglas (no requiere clave API)
 ops0 -m "quiero planificar mi código IaC"
 
@@ -47,12 +50,9 @@ ops0 -m "verifica si mis pods de kubernetes están corriendo" -ai
 
 # Modo de solución de problemas
 ops0 -m "mi terraform apply falla por state lock" -troubleshoot
-
-# Modo de operaciones interactivas
-ops0 -o
 ```
 
-*Usa `ops0 -o` para el modo de operaciones interactivas: ingresa solicitudes en lenguaje natural y ejecuta múltiples operaciones en una sesión hasta escribir 'quit' o 'exit'.*
+*¡Simplemente ejecuta `ops0` para entrar en modo interactivo y comenzar a chatear con solicitudes en lenguaje natural!*
 
 ## Operaciones en Acción
 
@@ -62,6 +62,11 @@ Aquí hay algunos ejemplos reales de ops0 en acción con diferentes herramientas
 [![Video del Modo Administrador de Kafka](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
 
 *Ejemplo: Administre interactivamente los clústeres de Kafka utilizando lenguaje natural.*
+
+## Modo Interactivo
+
+![ops0 Modo Interactivo](assets/ops0-intro-cli.png)
+*Entra en modo interactivo ejecutando 'ops0' y comienza a chatear con comandos en lenguaje natural*
 
 ### Operaciones de AWS CLI
 ![AWS CLI Example](assets/aws.png)
