@@ -273,8 +273,29 @@ func executeDryRun(suggestion *CommandSuggestion) {
 	}
 }
 
+func showWelcomeMessage() {
+	fmt.Println()
+	fmt.Println("  ██████╗ ██████╗ ███████╗ ██████╗ ")
+	fmt.Println("  ██╔══██╗██╔══██╗██╔════╝██╔═══██╗")
+	fmt.Println("  ██║  ██║██████╔╝███████╗██║ █ ██║")
+	fmt.Println("  ██║  ██║██╔═══╝ ╚════██║██║ █ ██║")
+	fmt.Println("  ██████╔╝██║     ███████║██████╔╝ ")
+	fmt.Println("  ╚═════╝ ╚═╝     ╚══════╝╚═════╝  ")
+	fmt.Println()
+	fmt.Println("🤖 ⚡ 👉 Natural Language DevOps Automation & Troubleshooting Tool")
+	fmt.Println()
+	fmt.Println("ops0 is an AI-powered natural language DevOps CLI native to Claude AI")
+	fmt.Println("with ansible, terraform, kubernetes, aws, azure and docker operations")
+	fmt.Println("in a single cli. An open-source alternative to complex DevOps workflows,")
+	fmt.Println("manual operations, etc.")
+	fmt.Println()
+	fmt.Println("Type 'quit' or 'exit' to leave interactive mode")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println()
+}
+
 func runInteractiveSession() {
-	fmt.Println("🔄 ops0 Interactive Operations Mode (type 'quit' or 'exit' to leave)")
+	showWelcomeMessage()
 	reader := bufio.NewReader(os.Stdin)
 	var claudeConfig *ClaudeConfig
 	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
