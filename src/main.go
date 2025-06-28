@@ -26,7 +26,6 @@ func main() {
 	var troubleshoot bool
 	var showStats bool
 	var installAll bool
-	var interactiveMode bool
 	var adminMode string
 	var kafkaBrokers string
 	var kafkaCommandConfig string
@@ -38,7 +37,6 @@ func main() {
 	flag.BoolVar(&troubleshoot, "troubleshoot", false, "troubleshooting mode with context analysis")
 	flag.BoolVar(&showStats, "stats", false, "show usage statistics")
 	flag.BoolVar(&installAll, "install", false, "install all supported tools")
-	flag.BoolVar(&interactiveMode, "o", false, "operations interactive mode")
 	flag.StringVar(&adminMode, "admin", "", "enter admin mode for a specific service (e.g., 'kafka')")
 	flag.StringVar(&kafkaBrokers, "brokers", "", "comma-separated list of Kafka brokers for admin mode")
 	flag.StringVar(&kafkaCommandConfig, "command-config", "", "path to Kafka command config file for SSL/SASL")
@@ -64,11 +62,6 @@ func main() {
 		return
 	}
 
-	if interactiveMode {
-		runInteractiveSession()
-		return
-	}
-
 	if displayHelp {
 		showHelp()
 		return
@@ -90,10 +83,9 @@ func main() {
 
 	// Check if message was provided
 	if message == "" {
-		fmt.Println("❌ ops0: No command message provided.")
-		fmt.Println("💡 Use -m flag to specify a command, or -help for usage information.")
-		showHelp()
-		os.Exit(1)
+		// No message provided, go to interactive mode by default
+		runInteractiveSession()
+		return
 	}
 
 	// Initialize Claude if API key is available
@@ -173,8 +165,8 @@ func showHelp() {
 
 	// Basic Usage
 	fmt.Println("📋 Usage:")
+	fmt.Println("  ops0                                    # Enter interactive mode (default)")
 	fmt.Println("  ops0 -m \"your natural language command\"")
-	fmt.Println("  ops0 -o")
 	fmt.Println("  ops0 -m \"command\" -ai")
 	fmt.Println("  ops0 -m \"error description\" -troubleshoot")
 	fmt.Println("  ops0 -version")
@@ -182,8 +174,7 @@ func showHelp() {
 
 	// Flags
 	fmt.Println("\n🚩 Flags:")
-	fmt.Println("  -m           Natural language command message (required)")
-	fmt.Println("  -o           Enter interactive operations mode")
+	fmt.Println("  -m           Natural language command message")
 	fmt.Println("  -ai          Enable AI mode for advanced command generation")
 	fmt.Println("  -troubleshoot Enable troubleshooting mode with context analysis")
 	fmt.Println("  -version     Show version information")
