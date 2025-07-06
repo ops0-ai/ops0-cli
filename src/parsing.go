@@ -262,7 +262,7 @@ func ParseIntent(input string) *CommandSuggestion {
 	}
 
 	// Log analysis patterns
-	if matched, _ := regexp.MatchString(`(analyze|review|check|summarize|inspect).*(logs?|log files?|pod logs?)`, input); matched {
+	if matched, _ := regexp.MatchString(`(analyze|review|check|summarize|inspect|perform|debug).*(logs?|log files?|pod logs?)`, input); matched {
 		// Kubernetes pod log analysis
 		podRe := regexp.MustCompile(`pod\s+([a-zA-Z0-9-]+)`)
 		nsRe := regexp.MustCompile(`namespace\s+([a-zA-Z0-9-]+)`)
@@ -297,10 +297,61 @@ func ParseIntent(input string) *CommandSuggestion {
 		}
 	}
 
-	// Log file analysis pattern
-	fileRe := regexp.MustCompile(`(?:analyze|review|check|summarize|inspect)[^\n]*?(/[^\s]+\.log)`) // non-greedy match for file path
-	if m := fileRe.FindStringSubmatch(input); len(m) > 1 {
-		filePath := m[1]
+	// Kubernetes pod log analysis patterns - more specific
+	if matched, _ := regexp.MatchString(`(kubectl|k8s|kubernetes).*(logs?|debug|tail|follow)`, input); matched {
+		// Extract pod name and namespace
+		podRe := regexp.MustCompile(`pod\s+([a-zA-Z0-9-]+)`)
+		nsRe := regexp.MustCompile(`namespace\s+([a-zA-Z0-9-]+)`)
+		pod := ""
+		ns := "default"
+		if m := podRe.FindStringSubmatch(input); len(m) > 1 {
+			pod = m[1]
+		}
+		if m := nsRe.FindStringSubmatch(input); len(m) > 1 {
+			ns = m[1]
+		}
+		
+		// If no specific pod mentioned, try to get pods in namespace
+		if pod == "" {
+			return &CommandSuggestion{
+				Tool:        "kubectl",
+				Command:     "kubectl get pods -n " + ns,
+				Description: "List pods in namespace '" + ns + "' to select one for log analysis.",
+				Intent:      "list_pods_for_logs",
+				Confidence:  0.9,
+				AIGenerated: false,
+				HasDryRun:   false,
+			}
+		}
+		
+		// Check if real-time/follow is requested
+		if strings.Contains(input, "realtime") || strings.Contains(input, "follow") || strings.Contains(input, "tail") || strings.Contains(input, "debug") {
+			return &CommandSuggestion{
+				Tool:        "kubectl",
+				Command:     "kubectl logs " + pod + " -n " + ns + " -f",
+				Description: "Follow logs in real-time for pod '" + pod + "' in namespace '" + ns + "'.",
+				Intent:      "analyze_logs_realtime",
+				Confidence:  0.95,
+				AIGenerated: false,
+				HasDryRun:   false,
+			}
+		}
+		
+		return &CommandSuggestion{
+			Tool:        "kubectl",
+			Command:     "kubectl logs " + pod + " -n " + ns + " --tail=100",
+			Description: "Fetch and analyze the last 100 log lines for pod '" + pod + "' in namespace '" + ns + "'.",
+			Intent:      "analyze_logs",
+			Confidence:  0.95,
+			AIGenerated: false,
+			HasDryRun:   false,
+		}
+	}
+
+	// Log file analysis pattern - improved to handle more general paths
+	fileRe := regexp.MustCompile(`(?:analyze|review|check|summarize|inspect|perform|debug)[^\n]*?(from\s+)?(/[^\s]+)`) // non-greedy match for file path
+	if m := fileRe.FindStringSubmatch(input); len(m) > 2 {
+		filePath := m[2] // Use the second group which is the actual path
 		return &CommandSuggestion{
 			Tool:        "system_admin",
 			Command:     "tail -n 100 " + filePath,
