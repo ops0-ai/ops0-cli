@@ -1,4 +1,4 @@
-module ops0
+module kafka-agent
 
 go 1.19
 
