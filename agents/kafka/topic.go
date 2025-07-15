@@ -2,8 +2,7 @@ package main
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+	"os"
 
 	"github.com/spf13/cobra"
 )

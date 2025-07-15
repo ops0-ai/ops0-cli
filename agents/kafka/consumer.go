@@ -1,8 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -331,15 +331,4 @@ func simulateKafkaMessage(topic string) map[string]interface{} {
 	}
 }
 
-// Helper functions
-func getBool(m map[string]interface{}, key string) bool {
-	if val, ok := m[key]; ok {
-		switch v := val.(type) {
-		case bool:
-			return v
-		case string:
-			return v == "true"
-		}
-	}
-	return false
-} 
+// Helper functions are now in types.go 

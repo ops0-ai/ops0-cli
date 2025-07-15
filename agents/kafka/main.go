@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -267,10 +265,7 @@ func GetKafkaCommandSuggestion(userInput string) *CommandSuggestion {
 	return suggestion
 }
 
-// Helper functions
-func getCurrentTimestamp() string {
-	return time.Now().Format(time.RFC3339)
-}
+// Helper functions are now in types.go
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
