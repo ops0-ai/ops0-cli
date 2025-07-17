@@ -199,7 +199,19 @@ func ExecuteKafkaCommand(command *KafkaCommand) error {
 	case "topic_list":
 		return listTopics()
 	case "topic_create":
-		return createTopic(command.Topic, command.Config)
+		// Extract topic creation parameters from config
+		partitions := int32(getInt(command.Config, "partitions"))
+		replicationFactor := int16(getInt(command.Config, "replication-factor"))
+		cleanupPolicy := getString(command.Config, "cleanup-policy")
+		retentionMs := getString(command.Config, "retention-ms")
+		segmentBytes := getString(command.Config, "segment-bytes")
+		
+		configs := map[string]*string{
+			"cleanup.policy": ptrString(cleanupPolicy),
+			"retention.ms":   ptrString(retentionMs),
+			"segment.bytes":  ptrString(segmentBytes),
+		}
+		return createTopic(command.Topic, partitions, replicationFactor, configs)
 	case "topic_delete":
 		return deleteTopic(command.Topic)
 	case "topic_describe":
@@ -265,7 +277,10 @@ func GetKafkaCommandSuggestion(userInput string) *CommandSuggestion {
 	return suggestion
 }
 
-// Helper functions are now in types.go
+// Helper functions
+func ptrString(s string) *string {
+	return &s
+}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {

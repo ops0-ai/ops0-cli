@@ -31,7 +31,7 @@ var consumerConfigCmd = &cobra.Command{
 		config["max-poll-records"], _ = cmd.Flags().GetInt("max-poll-records")
 		config["key-deserializer"], _ = cmd.Flags().GetString("key-deserializer")
 		config["value-deserializer"], _ = cmd.Flags().GetString("value-deserializer")
-		
+
 		if err := configureConsumer(config); err != nil {
 			fmt.Printf("❌ Error configuring consumer: %v\n", err)
 			os.Exit(1)
@@ -62,7 +62,7 @@ var consumerConsumeCmd = &cobra.Command{
 		metadata["timeout"], _ = cmd.Flags().GetInt("timeout")
 		metadata["max-messages"], _ = cmd.Flags().GetInt("max-messages")
 		metadata["follow"], _ = cmd.Flags().GetBool("follow")
-		
+
 		if err := consumeMessages(args[0], metadata); err != nil {
 			fmt.Printf("❌ Error consuming messages: %v\n", err)
 			os.Exit(1)
@@ -85,7 +85,7 @@ var consumerStatusCmd = &cobra.Command{
 var consumerGroupsCmd = &cobra.Command{
 	Use:   "groups",
 	Short: "List consumer groups",
-	Long:  `List all consumer groups and their status.`,
+	Long:  `List all consumer groups in the Kafka cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := listConsumerGroups(); err != nil {
 			fmt.Printf("❌ Error listing consumer groups: %v\n", err)
@@ -105,12 +105,12 @@ func init() {
 	consumerConfigCmd.Flags().Int("max-poll-records", 500, "Max poll records")
 	consumerConfigCmd.Flags().String("key-deserializer", "org.apache.kafka.common.serialization.StringDeserializer", "Key deserializer class")
 	consumerConfigCmd.Flags().String("value-deserializer", "org.apache.kafka.common.serialization.StringDeserializer", "Value deserializer class")
-	
+
 	// Consumer consume flags
 	consumerConsumeCmd.Flags().Int("timeout", 5000, "Consume timeout in milliseconds")
 	consumerConsumeCmd.Flags().Int("max-messages", 10, "Maximum number of messages to consume")
 	consumerConsumeCmd.Flags().Bool("follow", false, "Follow mode (continuous consumption)")
-	
+
 	consumerCmd.AddCommand(consumerConfigCmd, consumerSubscribeCmd, consumerConsumeCmd, consumerStatusCmd, consumerGroupsCmd)
 	rootCmd.AddCommand(consumerCmd)
 }
@@ -129,7 +129,7 @@ func configureConsumer(config map[string]interface{}) error {
 		ValueDeserializer:  getString(config, "value-deserializer"),
 		Properties:         make(map[string]string),
 	}
-	
+
 	// Add common properties
 	consumerConfig.Properties["bootstrap.servers"] = strings.Join(kafkaAgent.config.Brokers, ",")
 	consumerConfig.Properties["group.id"] = consumerConfig.GroupID
@@ -140,7 +140,7 @@ func configureConsumer(config map[string]interface{}) error {
 	consumerConfig.Properties["max.poll.records"] = strconv.Itoa(consumerConfig.MaxPollRecords)
 	consumerConfig.Properties["key.deserializer"] = consumerConfig.KeyDeserializer
 	consumerConfig.Properties["value.deserializer"] = consumerConfig.ValueDeserializer
-	
+
 	// Add security properties if configured
 	if kafkaAgent.config.SecurityProtocol != "PLAINTEXT" {
 		consumerConfig.Properties["security.protocol"] = kafkaAgent.config.SecurityProtocol
@@ -150,14 +150,14 @@ func configureConsumer(config map[string]interface{}) error {
 			consumerConfig.Properties["sasl.password"] = kafkaAgent.config.Password
 		}
 	}
-	
+
 	kafkaAgent.consumer = consumerConfig
-	
+
 	// Save configuration
 	if err := saveConsumerConfig(consumerConfig); err != nil {
 		return fmt.Errorf("error saving consumer configuration: %v", err)
 	}
-	
+
 	fmt.Println("✅ Consumer configuration saved successfully!")
 	fmt.Printf("📋 Configuration:\n")
 	fmt.Printf("   Topic: %s\n", consumerConfig.Topic)
@@ -167,7 +167,7 @@ func configureConsumer(config map[string]interface{}) error {
 	fmt.Printf("   Auto Commit Interval: %d ms\n", consumerConfig.AutoCommitInterval)
 	fmt.Printf("   Session Timeout: %d ms\n", consumerConfig.SessionTimeout)
 	fmt.Printf("   Max Poll Records: %d\n", consumerConfig.MaxPollRecords)
-	
+
 	return nil
 }
 
@@ -175,24 +175,42 @@ func subscribeToTopic(topic string) error {
 	if kafkaAgent.consumer == nil {
 		return fmt.Errorf("no consumer configuration found. Run 'consumer config' first")
 	}
-	
+
 	fmt.Printf("📡 Subscribing to topic: %s\n", topic)
-	
+
 	// Update consumer config with topic
 	kafkaAgent.consumer.Topic = topic
-	
-	// Simulate subscription (in a real implementation, this would use a Kafka client)
+
+	// Test connection by creating a consumer
+	kc, err := NewKafkaClient(
+		kafkaAgent.config.Brokers,
+		kafkaAgent.config.SecurityProtocol,
+		kafkaAgent.config.SASLMechanism,
+		kafkaAgent.config.Username,
+		kafkaAgent.config.Password,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Kafka client: %v", err)
+	}
+	defer kc.Close()
+
+	consumer, err := kc.CreateConsumer(kafkaAgent.consumer)
+	if err != nil {
+		return fmt.Errorf("failed to create consumer: %v", err)
+	}
+	defer consumer.Close()
+
 	fmt.Printf("✅ Successfully subscribed to topic '%s'\n", topic)
 	fmt.Printf("   Group ID: %s\n", kafkaAgent.consumer.GroupID)
 	fmt.Printf("   Auto Offset Reset: %s\n", kafkaAgent.consumer.AutoOffsetReset)
-	
+
 	// Log the operation
 	logConsumerOperation("subscribe", map[string]interface{}{
 		"topic":     topic,
 		"group_id":  kafkaAgent.consumer.GroupID,
 		"timestamp": getCurrentTimestamp(),
 	})
-	
+
 	return nil
 }
 
@@ -200,49 +218,46 @@ func consumeMessages(topic string, metadata map[string]interface{}) error {
 	timeout := getInt(metadata, "timeout")
 	maxMessages := getInt(metadata, "max-messages")
 	follow := getBool(metadata, "follow")
-	
+
 	if kafkaAgent.consumer == nil {
 		return fmt.Errorf("no consumer configuration found. Run 'consumer config' first")
 	}
-	
-	fmt.Printf("�� Consuming messages from topic: %s\n", topic)
+
+	fmt.Printf("📨 Consuming messages from topic: %s\n", topic)
 	if follow {
 		fmt.Println("🔄 Follow mode enabled (continuous consumption)")
 	}
-	
-	// Simulate message consumption
-	messageCount := 0
-	for {
-		// Simulate receiving a message
-		message := simulateKafkaMessage(topic)
-		
-		if message != nil {
-			fmt.Printf("\n📨 Message #%d:\n", messageCount+1)
-			fmt.Printf("   Topic: %s\n", message["topic"])
-			fmt.Printf("   Partition: %d\n", message["partition"])
-			fmt.Printf("   Offset: %d\n", message["offset"])
-			if message["key"] != nil {
-				fmt.Printf("   Key: %s\n", message["key"])
-			}
-			fmt.Printf("   Value: %s\n", message["value"])
-			fmt.Printf("   Timestamp: %s\n", message["timestamp"])
-			
-			messageCount++
-			
-			// Log the consumed message
-			logConsumerOperation("consume", message)
-		}
-		
-		// Check if we should stop
-		if !follow && messageCount >= maxMessages {
-			break
-		}
-		
-		// Simulate processing time
-		time.Sleep(time.Duration(timeout) * time.Millisecond)
+
+	// Create Kafka client
+	kc, err := NewKafkaClient(
+		kafkaAgent.config.Brokers,
+		kafkaAgent.config.SecurityProtocol,
+		kafkaAgent.config.SASLMechanism,
+		kafkaAgent.config.Username,
+		kafkaAgent.config.Password,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Kafka client: %v", err)
 	}
-	
-	fmt.Printf("\n✅ Consumed %d messages from topic '%s'\n", messageCount, topic)
+	defer kc.Close()
+
+	// Create consumer
+	consumer, err := kc.CreateConsumer(kafkaAgent.consumer)
+	if err != nil {
+		return fmt.Errorf("failed to create consumer: %v", err)
+	}
+	defer consumer.Close()
+
+	// Consume messages
+	consumeTimeout := time.Duration(timeout) * time.Millisecond
+	if follow {
+		consumeTimeout = 0 // No timeout for follow mode
+	}
+
+	if err := kc.ConsumeMessages(consumer, topic, maxMessages, consumeTimeout); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -250,7 +265,7 @@ func showConsumerStatus() error {
 	if kafkaAgent.consumer == nil {
 		return fmt.Errorf("no consumer configuration found. Run 'consumer config' first")
 	}
-	
+
 	fmt.Println("📊 Consumer Status:")
 	fmt.Printf("   Topic: %s\n", kafkaAgent.consumer.Topic)
 	fmt.Printf("   Group ID: %s\n", kafkaAgent.consumer.GroupID)
@@ -261,41 +276,50 @@ func showConsumerStatus() error {
 	fmt.Printf("   Max Poll Records: %d\n", kafkaAgent.consumer.MaxPollRecords)
 	fmt.Printf("   Key Deserializer: %s\n", kafkaAgent.consumer.KeyDeserializer)
 	fmt.Printf("   Value Deserializer: %s\n", kafkaAgent.consumer.ValueDeserializer)
-	
-	// Show connection status
-	if kafkaAgent.connection.Connected {
-		fmt.Println("   Connection: ✅ Connected")
-	} else {
+
+	// Test connection
+	kc, err := NewKafkaClient(
+		kafkaAgent.config.Brokers,
+		kafkaAgent.config.SecurityProtocol,
+		kafkaAgent.config.SASLMechanism,
+		kafkaAgent.config.Username,
+		kafkaAgent.config.Password,
+	)
+	if err != nil {
 		fmt.Println("   Connection: ❌ Disconnected")
-		if kafkaAgent.connection.LastError != nil {
-			fmt.Printf("   Last Error: %v\n", kafkaAgent.connection.LastError)
-		}
+		fmt.Printf("   Last Error: %v\n", err)
+		return nil
 	}
-	
+	defer kc.Close()
+
+	// Try to create a consumer to test connectivity
+	consumer, err := kc.CreateConsumer(kafkaAgent.consumer)
+	if err != nil {
+		fmt.Println("   Connection: ❌ Disconnected")
+		fmt.Printf("   Last Error: %v\n", err)
+	} else {
+		consumer.Close()
+		fmt.Println("   Connection: ✅ Connected")
+	}
+
 	return nil
 }
 
 func listConsumerGroups() error {
+	// Note: Sarama doesn't provide direct consumer group listing
+	// This would typically require Kafka Admin API or JMX
 	fmt.Println("📋 Consumer Groups:")
-	
-	// Simulate listing consumer groups
-	groups := []map[string]interface{}{
-		{
-			"group_id":      "test-group-1",
-			"state":         "Stable",
-			"members":       3,
-			"topics":        []string{"test-topic-1", "test-topic-2"},
-			"last_activity": "2024-01-15T10:30:00Z",
-		},
-		{
-			"group_id":      "test-group-2",
-			"state":         "Empty",
-			"members":       0,
-			"topics":        []string{"test-topic-3"},
-			"last_activity": "2024-01-15T09:15:00Z",
-		},
+	fmt.Println("   Note: Consumer group listing requires Kafka Admin API or JMX access")
+	fmt.Println("   This feature is not available with the current Sarama implementation")
+
+	// For now, return empty list
+	groups := []map[string]interface{}{}
+
+	if len(groups) == 0 {
+		fmt.Println("   No consumer groups found or listing not supported")
+		return nil
 	}
-	
+
 	for _, group := range groups {
 		fmt.Printf("\n   Group ID: %s\n", group["group_id"])
 		fmt.Printf("   State: %s\n", group["state"])
@@ -303,7 +327,7 @@ func listConsumerGroups() error {
 		fmt.Printf("   Topics: %v\n", group["topics"])
 		fmt.Printf("   Last Activity: %s\n", group["last_activity"])
 	}
-	
+
 	return nil
 }
 
@@ -316,19 +340,4 @@ func saveConsumerConfig(config *ConsumerConfig) error {
 func logConsumerOperation(operation string, payload map[string]interface{}) {
 	// In a real implementation, this would log to a file or monitoring system
 	fmt.Printf("📝 Logged consumer operation: %s\n", operation)
-}
-
-func simulateKafkaMessage(topic string) map[string]interface{} {
-	// Simulate a Kafka message
-	return map[string]interface{}{
-		"topic":     topic,
-		"partition": 0,
-		"offset":    12345,
-		"key":       "message-key",
-		"value":     "Hello from Kafka!",
-		"timestamp": getCurrentTimestamp(),
-		"headers":   map[string]string{"source": "kafka-agent"},
-	}
-}
-
-// Helper functions are now in types.go 
+} 
