@@ -14,8 +14,9 @@ const (
 
 // Claude API configuration
 type ClaudeConfig struct {
-	APIKey string
-	Model  string
+	APIKey     string
+	APIBaseURL string
+	Model      string
 	MaxTokens int
 }
 

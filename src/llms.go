@@ -31,7 +31,12 @@ func callClaude(config *ClaudeConfig, systemPrompt, userMessage string) string {
 		return ""
 	}
 
-	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
+	apiURL := config.APIBaseURL
+	if apiURL == "" {
+		apiURL = "https://api.anthropic.com"
+	}
+	
+	req, err := http.NewRequest("POST", apiURL+"/v1/messages", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Printf("⚠️  ops0: Error creating AI request: %v\n", err)
 		return ""
@@ -83,8 +88,9 @@ func getClaudeConfigIfAvailable() *ClaudeConfig {
 		model = "claude-3-5-sonnet-20241022"
 	}
 	return &ClaudeConfig{
-		APIKey:    apiKey,
-		Model:     model,
-		MaxTokens: 1024,
+		APIKey:     apiKey,
+		APIBaseURL: os.Getenv("OPS0_API_BASE_URL"),
+		Model:      model,
+		MaxTokens:  1024,
 	}
 }

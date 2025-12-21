@@ -1069,9 +1069,10 @@ func runInteractiveSession() {
 			model = "claude-3-5-sonnet-20241022"
 		}
 		claudeConfig = &ClaudeConfig{
-			APIKey:    apiKey,
-			Model:     model,
-			MaxTokens: 1024,
+			APIKey:     apiKey,
+			APIBaseURL: os.Getenv("OPS0_API_BASE_URL"),
+			Model:      model,
+			MaxTokens:  1024,
 		}
 		fmt.Println("🧠 AI mode enabled in interactive session")
 	}
