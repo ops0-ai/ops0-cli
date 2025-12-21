@@ -80,9 +80,10 @@ Respond in this format:
 
 User request: ` + userMsg
 	claudeConfig := &ClaudeConfig{
-		APIKey: apiKey,
-		Model:  "claude-3-5-sonnet-20241022",
-		MaxTokens: 1024,
+		APIKey:     apiKey,
+		APIBaseURL: os.Getenv("OPS0_API_BASE_URL"),
+		Model:      "claude-3-5-sonnet-20241022",
+		MaxTokens:  1024,
 	}
 	response := callClaude(claudeConfig, prompt, "")
 	if response == "" {

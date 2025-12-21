@@ -96,9 +96,10 @@ func main() {
 			model = "claude-3-5-sonnet-20241022"
 		}
 		claudeConfig = &ClaudeConfig{
-			APIKey:    apiKey,
-			Model:     model,
-			MaxTokens: 1024,
+			APIKey:     apiKey,
+			APIBaseURL: os.Getenv("OPS0_API_BASE_URL"),
+			Model:      model,
+			MaxTokens:  1024,
 		}
 		fmt.Println("🧠 ops0: AI mode enabled")
 	} else if aiMode {
