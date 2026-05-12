@@ -49,7 +49,11 @@ func runLogin(cmd *cobra.Command, _ []string) error {
 		key = os.Getenv("OPS0_API_KEY")
 	}
 	if key == "" {
-		fmt.Fprintf(cmd.OutOrStdout(), "Paste your ops0 API key (get one at %s/settings):\n", cfg.APIBaseURL)
+		// Always point users at the production dashboard URL even when their
+		// CLI is configured against localhost — the API base and the dashboard
+		// origin can differ in dev, and the friendly URL is the recoverable
+		// one regardless of which mode you're in.
+		fmt.Fprintln(cmd.OutOrStdout(), "Paste your ops0 API key (get one at https://brew.ops0.ai/settings?tab=api-keys):")
 		// We use a regular bufio reader rather than golang.org/x/term so this
 		// builds with no extra deps on Windows. Trade-off: key is visible
 		// while typing. Most users will paste, not type, so it's acceptable.

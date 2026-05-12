@@ -177,19 +177,44 @@ func upsertClaudeHooks(repoRoot string) error {
 	}
 	path := filepath.Join(dir, "settings.json")
 
-	// The hook command:
-	//   Claude Code's PostToolUse hook passes a JSON payload on STDIN with
-	//   `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
-	//   (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
-	//   despite what older docs suggest — we have to parse the JSON.
-	//   We use Python because it's universally available on macOS/Linux
-	//   without an extra brew install (jq would have been our other choice).
+	// ── PostToolUse: scan IaC files after they're written ────────────────────
 	//
-	//   Filter to IaC extensions so we don't run the scanner on every Edit.
-	//   Send `ops0` output to stderr so Claude Code surfaces it back to the
-	//   agent when we exit non-zero (exit 2 = "block this tool call, show
-	//   stderr to model" per Claude Code's hook contract).
-	hookCmd := `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
+	// Claude Code's PostToolUse hook passes a JSON payload on STDIN with
+	// `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
+	// (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
+	// despite what older docs suggest — we parse the JSON via python3
+	// (universal on macOS/Linux, no extra brew install required).
+	//
+	// Filter to IaC extensions so we don't run the scanner on every Edit.
+	// Send `ops0` output to stderr so Claude Code surfaces it back to the
+	// agent when we exit non-zero (exit 2 = "block this tool call, show
+	// stderr to model" per Claude Code's hook contract).
+	postToolUseCmd := `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
+
+	// ── PreToolUse: block destructive IaC commands BEFORE they run ───────────
+	//
+	// Fires on the Bash tool. We extract `tool_input.command` and pattern-match
+	// against `terraform/tofu/oxid destroy` (and `terraform plan -destroy`).
+	// PreToolUse is the right phase for command blocking — PostToolUse fires
+	// AFTER the command runs, by which point your infra is gone.
+	//
+	// Escape hatch: `OPS0_ALLOW_DESTROY=1` env var bypasses the block. Useful
+	// for planned tear-downs of dev environments without relaxing the policy.
+	//
+	// `terraform apply` is intentionally NOT blocked — applies are routine and
+	// blocking all of them would be unworkable. The right defense for apply
+	// is plan-aware: see `ops0 plan check` (coming next iteration).
+	preToolUseCmd := `if [ -n "${OPS0_ALLOW_DESTROY:-}" ]; then exit 0; fi
+cmd="$(python3 -c 'import json,sys; print((json.load(sys.stdin).get("tool_input") or {}).get("command",""))')"
+case "$cmd" in
+  *"terraform destroy"*|*"tofu destroy"*|*"oxid destroy"*|*"terraform plan -destroy"*|*"tofu plan -destroy"*)
+    echo "ops0 governance: this command would destroy infrastructure." 1>&2
+    echo "  Command: $cmd" 1>&2
+    echo "  Blocked by: organization policy (no unrestricted destroy)" 1>&2
+    echo "  Override:   prefix with  OPS0_ALLOW_DESTROY=1  and rerun." 1>&2
+    exit 2
+    ;;
+esac`
 
 	// Read existing settings (may not exist; that's fine).
 	var settings map[string]any
@@ -205,31 +230,30 @@ func upsertClaudeHooks(repoRoot string) error {
 		hooks = map[string]any{}
 	}
 
-	// Build our hook entry. We tag it with a comment so a future re-run can
-	// find and replace exactly this entry instead of appending duplicates.
-	ourEntry := map[string]any{
-		"matcher": "Edit|Write|MultiEdit",
-		"_ops0":   true, // sentinel for idempotent updates
-		"hooks": []any{
-			map[string]any{
-				"type":    "command",
-				"command": hookCmd,
+	// upsertEntry replaces any prior ops0-tagged entry in the given event
+	// array, so re-running init never accumulates duplicates.
+	upsertEntry := func(event string, matcher string, cmd string) {
+		arr, _ := hooks[event].([]any)
+		filtered := make([]any, 0, len(arr)+1)
+		for _, item := range arr {
+			m, ok := item.(map[string]any)
+			if ok && m["_ops0"] == true {
+				continue // drop our old entry; we'll re-add below
+			}
+			filtered = append(filtered, item)
+		}
+		filtered = append(filtered, map[string]any{
+			"_ops0":   true, // sentinel for idempotent updates
+			"matcher": matcher,
+			"hooks": []any{
+				map[string]any{"type": "command", "command": cmd},
 			},
-		},
+		})
+		hooks[event] = filtered
 	}
 
-	// Merge into PostToolUse array, replacing any prior ops0 entry.
-	postArr, _ := hooks["PostToolUse"].([]any)
-	filtered := make([]any, 0, len(postArr)+1)
-	for _, item := range postArr {
-		m, ok := item.(map[string]any)
-		if ok && m["_ops0"] == true {
-			continue // drop the old ops0 entry; we'll re-add below
-		}
-		filtered = append(filtered, item)
-	}
-	filtered = append(filtered, ourEntry)
-	hooks["PostToolUse"] = filtered
+	upsertEntry("PostToolUse", "Edit|Write|MultiEdit", postToolUseCmd)
+	upsertEntry("PreToolUse", "Bash", preToolUseCmd)
 	settings["hooks"] = hooks
 
 	out, err := json.MarshalIndent(settings, "", "  ")
