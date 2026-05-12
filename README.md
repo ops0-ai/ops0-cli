@@ -1,259 +1,144 @@
-<p align="center">
-  <img src="assets/logo.jpg" alt="ops0 CLI Logo" width="150">
-</p>
+# ops0 CLI
 
-<p align="center">
-  <a href="./README.zh-CN.md">ReadMe in Chinese</a> • 
-  <a href="./README.de.md">ReadMe in German</a> • 
-  <a href="./README.fr.md">ReadMe in French</a> • 
-  <a href="./README.es.md">ReadMe in Spanish</a> • 
-  <a href="./README.pt-BR.md">ReadMe in Portuguese</a> • 
-  <a href="https://discord.gg/4vnuq2WJrV">Discord Community</a>
-</p>
+Governance for AI coding assistants. Connects Claude Code, Codex, Gemini CLI,
+and any MCP-compatible agent to your organization's [ops0](https://brew.ops0.ai)
+policies so the IaC they generate is compliant **before it lands in a PR**.
 
-<p align="center">
-  <a href="https://github.com/ops0-ai/ops0-cli/commits/main"><img src="https://img.shields.io/github/last-commit/ops0-ai/ops0-cli" alt="Last Commit"></a>
-  <a href="https://github.com/ops0-ai/ops0-cli/releases"><img src="https://img.shields.io/github/v/release/ops0-ai/ops0-cli" alt="Latest Release"></a>
-  <a href="https://github.com/ops0-ai/ops0-cli/stargazers"><img src="https://img.shields.io/github/stars/ops0-ai/ops0-cli" alt="GitHub Stars"></a>
-  <a href="https://discord.gg/4vnuq2WJrV"><img src="https://img.shields.io/badge/Community-Discord-7289DA?logo=discord" alt="Discord"></a>
-</p>
+> Free and open source. Apache-2.0.
 
----
+## Why
 
-<p align="center">
-ops0 is an intelligent CLI tool that transforms natural language into DevOps operations.<br>
-Powered by Claude AI, it simplifies complex DevOps tasks by understanding your intent<br>
-and performing the right operations, making DevOps management more accessible and efficient.
-</p>
+Today, policy enforcement on IaC happens at the deploy gate — `terraform plan`
+runs against OPA, and bad code gets blocked after the engineer has already
+written it, opened a PR, and waited on CI.
 
-## ops0 in Action
+When an AI agent writes the code, you can do better: tell the agent the rules
+upfront, and have it generate compliant code in the first place. That's what
+this CLI does.
 
-![ops0 CLI Demo](assets/ops0cli.gif)
-*Watch ops0 translate natural language into powerful DevOps operations*
+## Install
 
-## Quick Start
-
-### Installation
-
-#### Using script
-```bash
-curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | bash
-```
-#### Manual compilation
-```bash
-export PATH=$PATH:<YOUR_GO_BINARY_PATH>
-go build -o ops0 ./src/...
-```
-
-### Basic Usage
-```bash
-# Interactive mode (default) - just run ops0!
-ops0
-
-# Rule-based mode (works without API key)
-ops0 -m "i want to plan my iac code"
-
-# AI-powered mode (requires API key)
-export ANTHROPIC_API_KEY=your_key_here
-ops0 -m "check if my kubernetes pods are running" -ai
-ops0 -m "Name of the directory where this cli is running? "
-ops0 -m "CPU and Memory information of the system where ops0 cli application is running? "
-
-
-# Troubleshooting mode
-ops0 -m "my terraform apply is failing with state lock" -troubleshoot
-```
-
-*Simply run `ops0` to enter interactive mode and start chatting with natural language requests!*
-
-## Operations in Action
-
-Here are some real-world examples of ops0 in action across different tools:
-
-### Kafka Admin Mode
-[![Kafka Admin Mode Video](assets/kafka-tn.png)](https://www.loom.com/share/c800f1f15865489780586c9d154ef365?sid=0e17ade7-6035-4eea-853a-c0e924ec4715)
-
-*Example: Interactively manage Kafka clusters using natural language.*
-
-## Interactive Mode
-
-![ops0 Interactive Mode](assets/ops0-intro-cli.png)
-*Enter interactive mode by running 'ops0' and start chatting with natural language commands*
-
-### ops0 statistics
-<img width="1022" alt="image" src="https://github.com/user-attachments/assets/000b01a3-6565-432d-96f1-cd64d912475c" />
-
-### AWS CLI Operations
-![AWS CLI Example](assets/aws.png)
-*Example: Managing AWS resources using natural language commands*
-
-### Docker Container Management
-![Docker Example](assets/docker.png)
-*Example: Managing Docker containers and images with simple English*
-
-### Ansible Automation
-![Ansible Example](assets/ansible.png)
-![Ansible Playbook](assets/ansible-playbook.png)
-*Example: Executing and validating Ansible playbooks effortlessly*
-
-### Terraform Infrastructure
-![Terraform Example](assets/terraform.png)
-*Example: Managing infrastructure as code with natural language*
-
-### Kubernetes Operations
-![Kubernetes Example](assets/kubernetes.png)
-*Example: Simplified Kubernetes cluster management and troubleshooting*
-
-### Install All Tools at Once
-
-![CLI Install All Tools](assets/cli-install.png)
-
-You can now install all supported DevOps tools with a single command:
+### macOS / Linux
 
 ```bash
-ops0 --install
+curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | sh
 ```
 
-This will automatically install Terraform, Ansible, kubectl, Docker, Helm, AWS CLI, gcloud, and Azure CLI, and show their versions in a summary table.
+That's it. The script detects your OS/arch, pulls the latest release tarball
+from GitHub, and drops the binary at `/usr/local/bin/ops0`.
 
-Each example demonstrates:
-- Natural language command input
-- AI-powered command translation
-- Clear command preview
-- Safe execution with confirmation
-- Detailed output formatting
+### Windows
 
-## Supported Tools & Features
+Download the latest `.zip` from the
+[releases page](https://github.com/ops0-ai/ops0-cli/releases/latest)
+and unzip `ops0.exe` somewhere on your `%PATH%`.
 
-### Core Tools
-- **Terraform** - Infrastructure as Code
-- **Ansible** - Configuration Management
-- **Kubernetes (kubectl)** - Container Orchestration
-- **Docker** - Containerization
-- **AWS CLI** - Amazon Web Services
-- **Helm** - Kubernetes Package Manager
-- **gcloud** - Google Cloud Platform
-- **Azure CLI** - Microsoft Azure
-- **System Admin** - Linux System Administration
+### Build from source
 
-### System Administration Examples
 ```bash
-# Monitor system resources
-ops0 -m "show memory usage on my machine"
-ops0 -m "check disk space"
-ops0 -m "display CPU usage"
-
-# Manage system services
-ops0 -m "restart service nginx"
-ops0 -m "check service status apache2"
-
-# Package management
-ops0 -m "install package docker"
-ops0 -m "update system packages"
-
-# System logs
-ops0 -m "show system logs"
-ops0 -m "check journal logs"
+git clone https://github.com/ops0-ai/ops0-cli && cd ops0-cli
+go build -o ops0 ./cmd/ops0
+sudo install -m 0755 ops0 /usr/local/bin/ops0
 ```
 
-### System Administration & Log Analysis Examples
+### Also install OPA (one-time)
+
+The CLI shells out to the [Open Policy Agent](https://www.openpolicyagent.org/)
+binary for local Rego evaluation. Code never leaves your machine.
+
 ```bash
-# Analyze Kubernetes pod logs and get AI-powered summary and recommendations
-ops0 -m "analyze logs for pod my-app-123 in namespace prod"
-
-# Analyze a specific log file for issues
-ops0 -m "analyze /var/log/nginx/error.log"
+brew install opa            # macOS
+# or download from https://www.openpolicyagent.org/docs/latest/#running-opa
 ```
 
-### Key Features
-- Natural language command translation
-- AI-powered troubleshooting
-- **Kubernetes pod log analysis with AI summary and suggested operations**
-- **Log file path analysis for issues and context**
-- Context-aware suggestions
-- Safe execution with confirmations
-- Dry run support for destructive operations
-- Automatic tool installation
+## Quick start
 
-## 🆚 AI vs Rule-Based Mode
-
-| Feature | Rule-Based | AI Mode |
-|---------|------------|---------|
-| Setup | No API key needed | Requires ANTHROPIC_API_KEY |
-| Speed | Instant | ~2-3 seconds |
-| Understanding | Pattern matching | Natural language |
-| Context Awareness | Limited | High |
-| Troubleshooting | Basic | Advanced |
-| Complex Scenarios | Limited | Excellent |
-| Offline Usage | ✅ | ❌ |
-
-## Configuration
-
-### Environment Variables
 ```bash
-# Required for AI features
-export ANTHROPIC_API_KEY=your_api_key
+# 1. Generate an API key at https://brew.ops0.ai/settings → API Keys → New API Key
+ops0 login
+# paste your key when prompted
 
-# Optional: Customize AI behavior
-export OPS0_AI_MODEL=claude-3-sonnet-20240229  # Default model
-export OPS0_MAX_TOKENS=1024                    # Response length
+# 2. In your IaC repo, bind it to an ops0 project (optional but recommended)
+cd ~/work/my-terraform-repo
+ops0 init --project=<project-id>
+
+# 3. See which policies apply
+ops0 policies list
+
+# 4. Check your IaC locally — code never leaves your machine
+terraform plan -out=plan.out
+terraform show -json plan.out > plan.json
+ops0 policies check plan.json
 ```
 
-### Config File (Future)
-```yaml
-# ~/.ops0/config.yaml
-ai:
-  provider: anthropic
-  model: claude-3-sonnet-20240229
-  max_tokens: 1024
-  
-tools:
-  terraform:
-    version_check: terraform version
-    install_cmd: brew install terraform
-  kubectl:
-    version_check: kubectl version --client
-    install_cmd: brew install kubectl
+## Integrate with Claude Code
+
+Add this to your Claude Code MCP config (`~/.config/claude/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "ops0": {
+      "command": "ops0",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
 ```
 
-## Privacy & Security
+Now Claude Code can call `list_policies` and `check_compliance` while it
+writes Terraform for you. Combined with `ops0 init`, which appends a
+governance section to your `CLAUDE.md`, the agent will:
 
-- **API Key**: Stored locally as environment variable
-- **No Data Storage**: Commands and context not stored by ops0
-- **Anthropic Privacy**: Follows Anthropic's data handling policies
-- **Local Processing**: Rule-based mode works completely offline
+1. Read the rules before generating any IaC
+2. Self-check before suggesting the edit
+3. Refuse to propose code that fails a policy
 
-## 🤝 Contributing
+## How it works
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+```
+┌─────────────────────┐         ┌──────────────────────┐
+│  Claude Code /      │ ──MCP── │  ops0 CLI (local)    │
+│  Codex / Gemini CLI │         │  - OPA local eval    │
+└─────────────────────┘         │  - API client        │
+                                └──────────┬───────────┘
+                                           │ HTTPS (API key)
+                                           ▼
+                                ┌──────────────────────┐
+                                │  ops0 platform       │
+                                │  - Policy storage    │
+                                │  - Telemetry / audit │
+                                └──────────────────────┘
+```
 
-### Areas needing help
-- New tool integrations
-- AI prompt improvements
-- Testing across different environments
-- Documentation and examples
+- **Policies live on the ops0 platform** (Rego + metadata, attached to
+  projects and groups). The CLI pulls them on demand.
+- **Rego evaluation runs locally** via the `opa` binary. Your `.tf` files,
+  plan JSONs, and module source never leave your machine.
+- **Only check results** (counts, policy IDs, severity, anonymized repo
+  hash) are reported back, and only if telemetry is enabled.
 
-## 🗺️ Roadmap
+## Commands
 
-### Current
-- [x] Claude AI integration
-- [x] Basic troubleshooting mode
-- [x] Context awareness
-- [x] Multi-tool support
+| Command                | What it does                                                    |
+|------------------------|-----------------------------------------------------------------|
+| `ops0 login`           | Authenticate with an API key from the ops0 settings UI          |
+| `ops0 init`            | Bind the current repo to a project; write a `CLAUDE.md` section |
+| `ops0 policies list`   | List policies in scope                                          |
+| `ops0 policies check`  | Run OPA locally against a Terraform plan JSON                   |
+| `ops0 mcp serve`       | Run the MCP server over stdio (for Claude Code et al.)          |
+| `ops0 version`         | Print version info                                              |
 
-### Coming Soon
-- [ ] Custom offline-capable model for air-gapped environments
-- [ ] Interactive multi-step workflows
-- [ ] Learning from user feedback
-- [ ] Custom tool configurations
-- [ ] Multiple AI provider support
-- [ ] Advanced context analysis
-- [ ] Team collaboration features
+## Config files
 
-## Tips
+- `~/.ops0/config.yaml` — user-wide credentials and defaults (`chmod 0600`)
+- `<repo>/.ops0/config.json` — per-repo project binding (check this into git)
 
-1. **Be Specific**: "my terraform plan shows 5 resources changing" vs "terraform error"
-2. **Use Troubleshoot Mode**: For complex issues, use `-troubleshoot` flag
-3. **Check Context**: AI works better when you're in the right directory
-4. **Review Commands**: Always review AI suggestions before confirming
-5. **Provide Feedback**: Use GitHub issues to report AI accuracy problems
+## Homebrew (coming soon)
+
+We'll publish to a Homebrew tap once the project stabilizes. Until then the
+curl installer above is the supported path.
+
+## License
+
+Apache 2.0. See [LICENSE](./LICENSE).

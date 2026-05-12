@@ -1,0 +1,67 @@
+name: ✨ Feature Request
+description: Suggest a feature or improvement for the ops0 CLI
+title: "[Feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea! Before filing, please:
+
+        - Check the [README](https://github.com/ops0-ai/ops0-cli#readme) to make sure the
+          feature doesn't already exist
+        - Search [existing issues](https://github.com/ops0-ai/ops0-cli/issues) for duplicates
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the CLI does this affect?
+      options:
+        - login / auth
+        - init / repo binding
+        - policies list / check
+        - mcp server (Claude Code, Codex, Gemini integration)
+        - CLAUDE.md / agent guardrails
+        - install / packaging
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem you're trying to solve?
+      description: |
+        Tell us about the workflow. We care more about the underlying need than a
+        specific implementation — "I want X" is fine but "I'm trying to do Y, and X
+        would help because Z" is even better.
+      placeholder: |
+        When my team's Claude Code generates Terraform, it sometimes proposes
+        public S3 buckets even though we have a policy against it. I'd like the
+        agent to see violations and self-correct before suggesting the code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal (optional)
+      description: If you have a specific design in mind, share it.
+      placeholder: |
+        Add a Claude Code PostToolUse hook helper: `ops0 hook claude-code install`
+        that wires up a per-file policy check after every Edit/Write.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      placeholder: |
+        - Pre-commit hook (but it's too late — the agent already wrote bad code)
+        - PR-time CI check (same problem)
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Screenshots, links, related projects, etc.

@@ -1,59 +1,88 @@
-name: Bug Report
-description: Report a bug in ops0
-labels: ["☢️ Bug"]
-
+name: 🐛 Bug Report
+description: Report a problem with the ops0 CLI
+title: "[Bug] "
+labels: ["bug", "triage"]
 body:
-  - type: dropdown
-    id: affected-functionalities
+  - type: markdown
     attributes:
-      label: Which ops0-cli features are the source of the bug?
-      options:
-        - operations
-        - kafka
-        - aws
-        - azure
-        - gcloud
-        - kubernetes
-        - system admin
-        - ansible
-        - terraform
-        - helm
-        - Don't known / other
-      multiple: true
+      value: |
+        Thanks for taking the time to file a bug. The more detail the faster we can fix it.
+        For security vulnerabilities, please email security@ops0.ai instead of filing publicly.
+
+  - type: input
+    id: version
+    attributes:
+      label: ops0 version
+      description: Output of `ops0 version`
+      placeholder: "ops0 0.5.7 (abc123, built 2026-05-12)"
     validations:
       required: true
 
-  - type: textarea
-    id: description
+  - type: dropdown
+    id: os
     attributes:
-      label: Description
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - Windows
+        - Other
     validations:
       required: true
 
   - type: input
+    id: opa-version
+    attributes:
+      label: OPA version (if relevant)
+      description: Output of `opa version` — only needed for `policies check` issues
+      placeholder: "0.65.0"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: |
+        I ran `ops0 policies check plan.json` and got "exit code 2" with no message.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: |
+        Either a list of violations or "✓ No violations."
+    validations:
+      required: true
+
+  - type: textarea
     id: reproduction
     attributes:
-      label: Please provide a link to a minimal reproduction of the bug
-
-  - type: textarea
-    id: exception-or-error
-    attributes:
-      label: Please provide the exception or error you saw
-      render: true
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: Please provide the version you discovered this bug in (ops0 --version)
-      render: true
+      label: Steps to reproduce
+      description: Exact commands you ran. Paste any minimal HCL/plan JSON if relevant.
       placeholder: |
-        ops0 version 0.5.3
-        commit: ffc6f23652092689526a5487c9974a8dcb429d85
-        built: 2025-06-27T05:44:02Z
-        go version: go1.21.13
-        platform: linux/amd64
+        1. `ops0 login` (paste key)
+        2. `ops0 init --project=...`
+        3. `terraform plan -out=plan.out && terraform show -json plan.out > plan.json`
+        4. `ops0 policies check plan.json`
+      render: bash
+    validations:
+      required: true
 
   - type: textarea
-    id: other
+    id: logs
     attributes:
-      label: Anything else?
+      label: Output / logs
+      description: Paste any error output. Remove or redact secrets first.
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Privacy check
+      options:
+        - label: I confirm I have removed any API keys, tokens, or secrets from the above.
+          required: true

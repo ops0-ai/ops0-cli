@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & discussions
+    url: https://github.com/ops0-ai/ops0-cli/discussions
+    about: Have a question, want feedback on an idea, or just want to chat? Use Discussions.
+  - name: 📚 Documentation
+    url: https://github.com/ops0-ai/ops0-cli#readme
+    about: Setup, commands, integration with Claude Code / Codex / Gemini, FAQ.
+  - name: 🔒 Security vulnerability
+    url: mailto:security@ops0.ai
+    about: Please report security issues privately via email, not GitHub Issues.
