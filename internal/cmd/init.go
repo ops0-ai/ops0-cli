@@ -178,11 +178,18 @@ func upsertClaudeHooks(repoRoot string) error {
 	path := filepath.Join(dir, "settings.json")
 
 	// The hook command:
-	//   - $CLAUDE_FILE_PATHS is set by Claude Code to the affected path(s).
-	//   - Filter to IaC files via a shell guard so non-Terraform edits don't
-	//     trigger the check (otherwise every Edit on any file blocks on us).
-	//   - Pipe stderr through; rely on exit code for enforcement.
-	hookCmd := `if echo "$CLAUDE_FILE_PATHS" | grep -qE '\.(tf|tofu|hcl|tf\.json)$'; then ops0 policies check "$CLAUDE_FILE_PATHS" || exit 2; fi`
+	//   Claude Code's PostToolUse hook passes a JSON payload on STDIN with
+	//   `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
+	//   (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
+	//   despite what older docs suggest — we have to parse the JSON.
+	//   We use Python because it's universally available on macOS/Linux
+	//   without an extra brew install (jq would have been our other choice).
+	//
+	//   Filter to IaC extensions so we don't run the scanner on every Edit.
+	//   Send `ops0` output to stderr so Claude Code surfaces it back to the
+	//   agent when we exit non-zero (exit 2 = "block this tool call, show
+	//   stderr to model" per Claude Code's hook contract).
+	hookCmd := `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
 
 	// Read existing settings (may not exist; that's fine).
 	var settings map[string]any
