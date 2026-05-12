@@ -41,16 +41,6 @@ go build -o ops0 ./cmd/ops0
 sudo install -m 0755 ops0 /usr/local/bin/ops0
 ```
 
-### Also install OPA (one-time)
-
-The CLI shells out to the [Open Policy Agent](https://www.openpolicyagent.org/)
-binary for local Rego evaluation. Code never leaves your machine.
-
-```bash
-brew install opa            # macOS
-# or download from https://www.openpolicyagent.org/docs/latest/#running-opa
-```
-
 ## Quick start
 
 ```bash
@@ -65,10 +55,9 @@ ops0 init --project=<project-id>
 # 3. See which policies apply
 ops0 policies list
 
-# 4. Check your IaC locally — code never leaves your machine
-terraform plan -out=plan.out
-terraform show -json plan.out > plan.json
-ops0 policies check plan.json
+# 4. Scan your IaC — files are sent over HTTPS to ops0, evaluated by Checkov
+#    + your org's Rego policies, and unified findings come back.
+ops0 policies check .
 ```
 
 ## Integrate with Claude Code
@@ -111,12 +100,15 @@ governance section to your `CLAUDE.md`, the agent will:
                                 └──────────────────────┘
 ```
 
-- **Policies live on the ops0 platform** (Rego + metadata, attached to
-  projects and groups). The CLI pulls them on demand.
-- **Rego evaluation runs locally** via the `opa` binary. Your `.tf` files,
-  plan JSONs, and module source never leave your machine.
+- **Policies live on the ops0 platform** (Rego + Checkov rules + compliance
+  frameworks like SOC2, attached to projects and groups). The CLI pulls them
+  on demand.
+- **IaC scanning is API-driven.** The CLI bundles your `.tf` / `.tofu`
+  files and sends them over HTTPS to ops0's scanner, which runs Checkov +
+  your Rego policies and returns unified findings. Files are held in a
+  tempdir for the duration of the scan and never persisted.
 - **Only check results** (counts, policy IDs, severity, anonymized repo
-  hash) are reported back, and only if telemetry is enabled.
+  hash) are reported back for audit telemetry, and only if telemetry is enabled.
 
 ## Commands
 
@@ -138,6 +130,19 @@ governance section to your `CLAUDE.md`, the agent will:
 
 We'll publish to a Homebrew tap once the project stabilizes. Until then the
 curl installer above is the supported path.
+
+## What `ops0 init` actually does
+
+| Action | File / Side effect |
+|--------|--------------------|
+| Binds the repo to an ops0 IaC project | `.ops0/config.json` |
+| Adds a governance section for Claude Code & other agents | `CLAUDE.md` (idempotent, fenced) |
+| Installs a `PostToolUse` hook that runs `ops0 policies check` after every `.tf`/`.tofu`/`.hcl` edit | `.claude/settings.json` |
+| Registers ops0 as an MCP server with Claude Code | `claude mcp add ops0 …` (best-effort; skips with `--skip-claude`) |
+
+The hook is what gives you actual enforcement: if Claude Code writes a non-compliant
+Terraform file, the hook fails non-zero, and Claude has to remediate before
+continuing.
 
 ## License
 
