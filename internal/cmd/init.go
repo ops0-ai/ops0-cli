@@ -79,6 +79,17 @@ func runInit(cmd *cobra.Command, _ []string) error {
 			fmt.Fprintln(cmd.OutOrStdout(), "✓ Installed .claude/settings.json PostToolUse hook for IaC files")
 		}
 
+		// User-level hooks: same destroy block + gated policy check.
+		// Fires for every CC session regardless of which directory CC opened,
+		// so editing this repo's IaC from a parent workspace still triggers
+		// the scan. Gated on `.ops0/config.json` walk-up so unrelated repos
+		// don't get policy checks they didn't opt into.
+		if err := upsertUserClaudeHooks(); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not install user-level Claude Code hooks: %v\n", err)
+		} else {
+			fmt.Fprintln(cmd.OutOrStdout(), "✓ Installed ~/.claude/settings.json hooks (fire from any workspace)")
+		}
+
 		if err := registerClaudeMCP(); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not register MCP server: %v\n", err)
 			fmt.Fprintln(cmd.ErrOrStderr(), "         You can run it manually: claude mcp add ops0 -- ops0 mcp serve")
@@ -175,43 +186,75 @@ func upsertClaudeHooks(repoRoot string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	path := filepath.Join(dir, "settings.json")
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseProjectCmd, preToolUseCmd)
+}
 
-	// ── PostToolUse: scan IaC files after they're written ────────────────────
-	//
-	// Claude Code's PostToolUse hook passes a JSON payload on STDIN with
-	// `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
-	// (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
-	// despite what older docs suggest — we parse the JSON via python3
-	// (universal on macOS/Linux, no extra brew install required).
-	//
-	// Filter to IaC extensions so we don't run the scanner on every Edit.
-	// Send `ops0` output to stderr so Claude Code surfaces it back to the
-	// agent when we exit non-zero (exit 2 = "block this tool call, show
-	// stderr to model" per Claude Code's hook contract).
-	postToolUseCmd := `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
+// upsertUserClaudeHooks writes the same destroy block and IaC policy check to
+// the user-level ~/.claude/settings.json. Because Claude Code's project-level
+// settings only fire when CC is launched at that workspace root, this is what
+// makes the hooks robust to "user opened a parent directory in CC."
+//
+// The user-level PostToolUse hook is GATED: it walks up from the edited
+// file's directory looking for a `.ops0/config.json`. Only if it finds one
+// (meaning `ops0 init` was run somewhere up the tree) does it invoke the
+// scanner. That way unrelated repos don't get policy checks they didn't
+// opt into.
+//
+// The PreToolUse destroy block is NOT gated — destroy is dangerous in any
+// repo, and the `OPS0_ALLOW_DESTROY=1` escape hatch still works.
+func upsertUserClaudeHooks() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseUserCmd, preToolUseCmd)
+}
 
-	// ── PreToolUse: block destructive IaC commands BEFORE they run ───────────
-	//
-	// Fires on the Bash tool. We extract `tool_input.command` and pattern-match
-	// against `terraform/tofu/oxid destroy` (and `terraform plan -destroy`).
-	// PreToolUse is the right phase for command blocking — PostToolUse fires
-	// AFTER the command runs, by which point your infra is gone.
-	//
-	// Escape hatch: `OPS0_ALLOW_DESTROY=1` env var bypasses the block. Useful
-	// for planned tear-downs of dev environments without relaxing the policy.
-	//
-	// `terraform apply` is intentionally NOT blocked — applies are routine and
-	// blocking all of them would be unworkable. The right defense for apply
-	// is plan-aware: see `ops0 plan check` (coming next iteration).
-	// On a destroy match we do two things in this order:
-	//   1) Best-effort: `ops0 telemetry blocked-command` POSTs the audit row
-	//      so the Activity tab in Settings shows the attempt. This call
-	//      ALWAYS exits 0 internally so its result can't suppress the block.
-	//   2) Print the human-readable block message and exit 2.
-	// The telemetry hop is wrapped in `>/dev/null 2>&1 &` so even if the
-	// network is hung the hook returns within a few hundred ms.
-	preToolUseCmd := `if [ -n "${OPS0_ALLOW_DESTROY:-}" ]; then exit 0; fi
+// ── Hook command strings ─────────────────────────────────────────────────────
+//
+// Claude Code's PostToolUse hook passes a JSON payload on STDIN with
+// `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
+// (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
+// despite what older docs suggest — we parse the JSON via python3
+// (universal on macOS/Linux, no extra brew install required).
+//
+// Filter to IaC extensions so we don't run the scanner on every Edit.
+// Send `ops0` output to stderr so Claude Code surfaces it back to the
+// agent when we exit non-zero (exit 2 = "block this tool call, show
+// stderr to model" per Claude Code's hook contract).
+const postToolUseProjectCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
+
+// User-level variant. Same idea, but walks up from the file's directory
+// looking for `.ops0/config.json` so we only run the scanner against
+// ops0-bound repos. If the file isn't IaC or we can't find a binding,
+// exit 0 (no-op).
+const postToolUseUserCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) d="$(dirname "$f")"; while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do if [ -f "$d/.ops0/config.json" ]; then ops0 policies check "$f" 1>&2 || exit 2; exit 0; fi; d="$(dirname "$d")"; done ;; esac`
+
+// ── PreToolUse: block destructive IaC commands BEFORE they run ───────────
+//
+// Fires on the Bash tool. We extract `tool_input.command` and pattern-match
+// against `terraform/tofu/oxid destroy` (and `terraform plan -destroy`).
+// PreToolUse is the right phase for command blocking — PostToolUse fires
+// AFTER the command runs, by which point your infra is gone.
+//
+// Escape hatch: `OPS0_ALLOW_DESTROY=1` env var bypasses the block. Useful
+// for planned tear-downs of dev environments without relaxing the policy.
+//
+// `terraform apply` is intentionally NOT blocked — applies are routine and
+// blocking all of them would be unworkable. The right defense for apply
+// is plan-aware: see `ops0 plan check` (coming next iteration).
+// On a destroy match we do two things in this order:
+//   1) Best-effort: `ops0 telemetry blocked-command` POSTs the audit row
+//      so the Activity tab in Settings shows the attempt. This call
+//      ALWAYS exits 0 internally so its result can't suppress the block.
+//   2) Print the human-readable block message and exit 2.
+// The telemetry hop is wrapped in `>/dev/null 2>&1 &` so even if the
+// network is hung the hook returns within a few hundred ms.
+const preToolUseCmd = `if [ -n "${OPS0_ALLOW_DESTROY:-}" ]; then exit 0; fi
 cmd="$(python3 -c 'import json,sys; print((json.load(sys.stdin).get("tool_input") or {}).get("command",""))')"
 case "$cmd" in
   *"terraform destroy"*|*"tofu destroy"*|*"oxid destroy"*|*"terraform plan -destroy"*|*"tofu plan -destroy"*)
@@ -225,7 +268,15 @@ case "$cmd" in
     ;;
 esac`
 
-	// Read existing settings (may not exist; that's fine).
+// writeClaudeHooks merges ops0 PostToolUse / PreToolUse hooks into an
+// arbitrary Claude Code settings.json (project-level or user-level). Used
+// by both upsertClaudeHooks (repo's .claude/settings.json) and
+// upsertUserClaudeHooks (~/.claude/settings.json).
+//
+// The `_ops0: true` sentinel on each entry lets us re-run init without
+// accumulating duplicate hook entries — we strip our prior entries and
+// re-append.
+func writeClaudeHooks(path, postCmd, preCmd string) error {
 	var settings map[string]any
 	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, &settings)
@@ -239,20 +290,18 @@ esac`
 		hooks = map[string]any{}
 	}
 
-	// upsertEntry replaces any prior ops0-tagged entry in the given event
-	// array, so re-running init never accumulates duplicates.
 	upsertEntry := func(event string, matcher string, cmd string) {
 		arr, _ := hooks[event].([]any)
 		filtered := make([]any, 0, len(arr)+1)
 		for _, item := range arr {
 			m, ok := item.(map[string]any)
 			if ok && m["_ops0"] == true {
-				continue // drop our old entry; we'll re-add below
+				continue
 			}
 			filtered = append(filtered, item)
 		}
 		filtered = append(filtered, map[string]any{
-			"_ops0":   true, // sentinel for idempotent updates
+			"_ops0":   true,
 			"matcher": matcher,
 			"hooks": []any{
 				map[string]any{"type": "command", "command": cmd},
@@ -261,8 +310,8 @@ esac`
 		hooks[event] = filtered
 	}
 
-	upsertEntry("PostToolUse", "Edit|Write|MultiEdit", postToolUseCmd)
-	upsertEntry("PreToolUse", "Bash", preToolUseCmd)
+	upsertEntry("PostToolUse", "Edit|Write|MultiEdit", postCmd)
+	upsertEntry("PreToolUse", "Bash", preCmd)
 	settings["hooks"] = hooks
 
 	out, err := json.MarshalIndent(settings, "", "  ")
