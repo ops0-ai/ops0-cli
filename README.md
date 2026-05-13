@@ -55,18 +55,6 @@ run. All audited.
 | **Audit trail** | Every blocked destroy and every failing scan is recorded against your API key. Browse it in `Settings → API Keys → Activity`. |
 | **Works everywhere** | Hooks install at both project-level and user-level, so they fire no matter which directory Claude Code opens at. |
 
-<img width="1596" height="916" alt="image" src="https://github.com/user-attachments/assets/5a7f4d22-5a72-4653-8df6-73a4ecfdb1de" />
-<img width="451" height="924" alt="image" src="https://github.com/user-attachments/assets/7044bd12-a99f-43e9-be22-2ca6bcea2cb0" />
-
-
-
-## API Key
-
-To get an API key, setup an account at https://brew.ops0.ai and then go to https://brew.ops0.ai/settings?tab=api-keys and follow the below steps in the images. 
-
-<img width="1644" height="872" alt="image" src="https://github.com/user-attachments/assets/3dd5053f-6007-4316-9110-08ebff69cf2e" />
-<img width="518" height="459" alt="image" src="https://github.com/user-attachments/assets/da20e110-5983-42a4-a6f3-d2dd8c911c76" />
-
 ## Quick start
 
 ```bash
