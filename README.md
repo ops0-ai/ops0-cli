@@ -4,7 +4,7 @@
 
 **Policy guardrails for AI coding agents.**
 
-Scans the Terraform, OpenTofu and OCI manifests your AI agent writes.
+Scans the Terraform, OpenTofu and [Oxid](https://oxid.sh) manifests your AI agent writes.
 Blocks `terraform destroy` before it runs. Ships an audit trail to ops0.
 Works with Claude Code, Codex and Gemini CLI.
 
