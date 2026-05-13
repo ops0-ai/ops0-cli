@@ -1,87 +1,91 @@
+<div align="center">
+
 # ops0 CLI
 
-Governance for AI coding assistants. Connects Claude Code, Codex, Gemini CLI,
-and any MCP-compatible agent to your organization's [ops0](https://brew.ops0.ai)
-policies so the IaC they generate is compliant **before it lands in a PR**.
+**Policy guardrails for AI coding agents.**
 
-> Free and open source. Apache-2.0.
+Scans the Terraform, OpenTofu and OCI manifests your AI agent writes.
+Blocks `terraform destroy` before it runs. Ships an audit trail to ops0.
+Works with Claude Code, Codex and Gemini CLI.
 
-## Why
-
-Today, policy enforcement on IaC happens at the deploy gate — `terraform plan`
-runs against OPA, and bad code gets blocked after the engineer has already
-written it, opened a PR, and waited on CI.
-
-When an AI agent writes the code, you can do better: tell the agent the rules
-upfront, and have it generate compliant code in the first place. That's what
-this CLI does.
-
-## Install
-
-### macOS / Linux
+[![Latest Release](https://img.shields.io/github/v/release/ops0-ai/ops0-cli?display_name=tag&sort=semver)](https://github.com/ops0-ai/ops0-cli/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ops0-ai/ops0-cli)](https://goreportcard.com/report/github.com/ops0-ai/ops0-cli)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | sh
 ```
 
-That's it. The script detects your OS/arch, pulls the latest release tarball
-from GitHub, and drops the binary at `/usr/local/bin/ops0`.
+[Quick start](#quick-start)
+· [How it works](#how-it-works)
+· [Integrations](#integrations)
+· [FAQ](#faq)
+· [Contributing](#contributing)
 
-### Windows
+</div>
 
-Download the latest `.zip` from the
-[releases page](https://github.com/ops0-ai/ops0-cli/releases/latest)
-and unzip `ops0.exe` somewhere on your `%PATH%`.
+---
 
-### Build from source
+## Why this exists
 
-```bash
-git clone https://github.com/ops0-ai/ops0-cli && cd ops0-cli
-go build -o ops0 ./cmd/ops0
-sudo install -m 0755 ops0 /usr/local/bin/ops0
-```
+When humans write infrastructure, policy gates fire on the PR. CI runs the
+scanner, someone gets paged, the PR sits in review for hours.
+
+When an **agent** writes infrastructure, that loop is broken. The agent
+will happily generate a public S3 bucket, an open security group, a wide
+IAM policy. By the time CI catches it, the agent has moved on.
+
+`ops0` sits in front of the agent. It reads your organization's policies,
+tells the agent the rules before it generates, fails the agent's edit if
+the result violates a policy, and blocks destructive commands before they
+run. All audited.
+
+> If you're using Claude Code, Codex, or Gemini CLI to ship infrastructure,
+> this is the smallest, sanest thing you can put between the model and your
+> cloud.
+
+## What it does
+
+| | |
+|---|---|
+| **Scans IaC after every edit** | A `PostToolUse` hook runs `ops0 policies check` against every `.tf` / `.tofu` / `.hcl` file the agent writes. Violations come back to the model as a failed tool call, so the agent self-remediates. |
+| **Blocks destroy commands** | A `PreToolUse` hook intercepts `terraform destroy`, `tofu destroy`, `oxid destroy` and the `-destroy` variants. Override with `OPS0_ALLOW_DESTROY=1`. |
+| **Speaks MCP** | `ops0 mcp serve` exposes `list_policies` and `check_compliance` to any MCP-compatible agent. Registered automatically with Claude Code on `ops0 init`. |
+| **Multi-project aware** | Walks up from the edited file to find the nearest `.ops0/config.json`. One repo with ten subprojects each maps to its own ops0 project. |
+| **Audit trail** | Every blocked destroy and every failing scan is recorded against your API key. Browse it in `Settings → API Keys → Activity`. |
+| **Works everywhere** | Hooks install at both project-level and user-level, so they fire no matter which directory Claude Code opens at. |
 
 ## Quick start
 
 ```bash
-# 1. Generate an API key at https://brew.ops0.ai/settings?tab=api-keys
-ops0 login --api-base https://brew.ops0.ai
-# paste your key when prompted (the --api-base is remembered for next time)
+# 1. Install
+curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | sh
 
-# 2. In your IaC repo (or subdirectory), bind it to an ops0 project
+# 2. Auth: get a key at https://brew.ops0.ai/settings?tab=api-keys
+ops0 login --api-base https://brew.ops0.ai
+
+# 3. Bind a repo (or any subdir) to an ops0 project
 cd ~/work/my-terraform-repo
 ops0 init --project=<project-id>
 
-# 3. See which policies apply (walks up to find the nearest .ops0/config.json)
-ops0 policies list
-
-# 4. Scan your IaC. Files are sent over HTTPS to ops0, evaluated by Checkov
-#    plus your org's Rego policies, and unified findings come back.
-ops0 policies check .
+# 4. Open Claude Code in the repo and write some Terraform.
+#    The PostToolUse hook scans every .tf file the agent writes.
+#    Try `terraform destroy` and watch the PreToolUse hook block it.
 ```
 
-## Integrate with Claude Code
+Verify it's wired up:
 
-`ops0 init` does the wiring for you. There is no manual MCP config to maintain:
+```console
+$ ops0 policies list
+NAME                              CATEGORY      SEVERITY  DESCRIPTION
+no-public-s3                      security      high      S3 buckets must not be public
+require-encryption-at-rest        security      medium    All storage must use customer-managed keys
+tag-required-cost-center          tagging       low       Every resource must carry a cost-center tag
+...
 
-- Runs `claude mcp add ops0 ops0 mcp serve` so Claude Code can call
-  `list_policies` and `check_compliance` while it writes Terraform.
-- Installs `PostToolUse` and `PreToolUse` hooks in **both**
-  `<dir>/.claude/settings.json` and `~/.claude/settings.json`. The user-level
-  file is what makes the hooks fire even when you open Claude Code at a
-  parent directory of an ops0-bound repo.
-- Appends a fenced governance section to `CLAUDE.md` so the agent reads the
-  rules before generating IaC.
-
-With this in place, the agent:
-
-1. Reads the rules in `CLAUDE.md` before generating any IaC.
-2. Gets a non-zero `PostToolUse` exit when it writes a non-compliant
-   `.tf` / `.tofu` / `.hcl` file, surfacing the violation back to the model
-   so it can remediate.
-3. Gets blocked before running `terraform destroy`, `tofu destroy`, or
-   `oxid destroy`. Override for planned tear-downs with
-   `OPS0_ALLOW_DESTROY=1`.
+$ ops0 policies check .
+12 findings (1 critical, 1 high, 10 medium) across 4 files.
+```
 
 ## How it works
 
@@ -97,63 +101,163 @@ With this in place, the agent:
                                 ┌──────────────────────┐
                                 │  ops0 platform       │
                                 │  - Policy storage    │
-                                │  - Checkov + Rego    │
+                                │  - Policy engine     │
                                 │  - Telemetry / audit │
                                 └──────────────────────┘
 ```
 
-- **Policies live on the ops0 platform.** Rego rules and Checkov rules
-  attached to projects and groups. The CLI pulls only those currently
-  enabled (disabled policies and disabled groups are filtered out
-  server-side).
-- **IaC scanning is API-driven.** The CLI bundles your `.tf` / `.tofu`
-  files and sends them over HTTPS to ops0's scanner, which runs Checkov
-  plus your Rego policies and returns unified findings. Files are held in
-  a tempdir for the duration of the scan and never persisted.
-- **Monorepo aware.** When the hook fires on a file edit, `policies check`
-  walks up from the file's directory to find the nearest `.ops0/config.json`.
-  Each subproject in a multi-project repo resolves to its own project ID.
-- **Only check results** (counts, policy IDs, severity, file path, line,
-  resource, an anonymized repo hash) are reported back for audit
-  telemetry, and only if telemetry is enabled.
+1. **Policies live on the ops0 platform.** Rules are attached to projects
+   and groups in the dashboard. The CLI pulls only the enabled ones at
+   request time, so disabling a rule in the UI takes effect immediately.
+2. **Scans happen server-side.** The CLI bundles your `.tf` / `.tofu`
+   files and sends them over HTTPS. Files are held in a tempdir for the
+   duration of the scan and never persisted.
+3. **The agent gets the truth.** A failing scan exits non-zero from the
+   `PostToolUse` hook with stderr containing the violation. Claude Code,
+   Codex, and Gemini CLI all surface that as a failed tool call back to
+   the model.
+4. **Destroy commands are blocked before they run.** The `PreToolUse` hook
+   matches on the Bash command string and exits 2 if it sees a destroy
+   pattern. The model sees the block and explains it to you instead of
+   tearing down infrastructure.
+5. **Everything is audited.** Each failed scan and each blocked destroy
+   becomes a row attached to your API key, visible in the ops0 dashboard.
+
+## Integrations
+
+### Claude Code
+
+`ops0 init` does the wiring for you:
+
+```bash
+ops0 init --project=<project-id>
+```
+
+That single command:
+
+- Writes `<cwd>/.ops0/config.json` to bind the directory to a project.
+- Installs `PostToolUse` (scan IaC) + `PreToolUse` (block destroys) hooks
+  in `<cwd>/.claude/settings.json`.
+- Installs the **same** hooks in `~/.claude/settings.json` so they fire
+  whatever directory you open Claude Code at. The user-level hook is
+  gated on a `.ops0/config.json` walk-up so unrelated repos aren't
+  scanned.
+- Appends a fenced governance section to `CLAUDE.md` so the agent reads
+  the rules before generating IaC.
+- Runs `claude mcp add ops0 ops0 mcp serve` so the agent can call
+  `list_policies` and `check_compliance` natively.
+
+Re-run `ops0 init --force` after upgrading the CLI to refresh the hook
+scripts.
+
+### Codex / Gemini CLI / any MCP client
+
+```bash
+ops0 mcp serve
+```
+
+Run that as a stdio MCP server. Tools exposed: `list_policies`,
+`check_compliance`, `whoami`. Wire it up via your client's MCP config.
+
+## Multi-project monorepos
+
+One repo, ten subprojects, each with its own policies? That works:
+
+```
+my-monorepo/
+├── prod/
+│   ├── .ops0/config.json     ← projectId: prod
+│   └── main.tf
+├── staging/
+│   ├── .ops0/config.json     ← projectId: staging
+│   └── main.tf
+└── shared/
+    ├── .ops0/config.json     ← projectId: shared
+    └── main.tf
+```
+
+When the hook fires on `prod/main.tf`, the CLI walks up from that file's
+directory to find `prod/.ops0/config.json` and scans against the `prod`
+project's policy set. Same edit in `staging/main.tf` resolves to the
+`staging` project. You can open Claude Code at `my-monorepo/` (the parent)
+and the routing still works.
 
 ## Commands
 
 | Command                          | What it does                                                          |
 |----------------------------------|-----------------------------------------------------------------------|
 | `ops0 login`                     | Authenticate with an API key from the ops0 settings UI                |
-| `ops0 init`                      | Bind the current directory to a project; install hooks; register MCP  |
+| `ops0 init`                      | Bind the current directory to a project, install hooks, register MCP  |
 | `ops0 policies list`             | List policies in scope for the current directory's project            |
-| `ops0 policies check`            | Scan IaC files at the given path against Checkov + your Rego policies |
+| `ops0 policies check [path]`     | Scan IaC files at the given path against your policies                |
 | `ops0 mcp serve`                 | Run the MCP server over stdio (for Claude Code et al.)                |
 | `ops0 telemetry blocked-command` | Record a destroy attempt blocked by the PreToolUse hook               |
 | `ops0 version`                   | Print version info                                                    |
 
 ## Config files
 
-- `~/.ops0/config.yaml` — user-wide credentials and defaults (`chmod 0600`)
-- `<dir>/.ops0/config.json` — per-directory project binding (commit this to git)
-- `<dir>/.claude/settings.json` — project-level Claude Code hooks
-- `~/.claude/settings.json` — user-level Claude Code hooks (so they fire from any workspace)
+| Path | Scope | Purpose |
+|---|---|---|
+| `~/.ops0/config.yaml` | User-wide | Credentials and defaults (`chmod 0600`) |
+| `<dir>/.ops0/config.json` | Per-directory | Project binding. Commit this to git. |
+| `<dir>/.claude/settings.json` | Per-directory | Project-level Claude Code hooks |
+| `~/.claude/settings.json` | User-wide | User-level Claude Code hooks (fire from any workspace) |
 
-## Homebrew (coming soon)
+## FAQ
 
-We'll publish to a Homebrew tap once the project stabilizes. Until then the
-curl installer above is the supported path.
+**Does it send my Terraform to the cloud?**
+Yes, over HTTPS, scoped by your API key. Files live in a tempdir on the
+scanner pod for the duration of the scan and are not persisted.
 
-## What `ops0 init` actually does
+**What happens if my CI runs `terraform apply`?**
+`apply` is intentionally not blocked. Blocking every `apply` would be
+unworkable. The right defense for `apply` is plan-aware, and that's on
+the roadmap. Today the focus is preventing the agent from writing bad
+IaC in the first place and preventing it from tearing down what's there.
 
-| Action | File / Side effect |
-|--------|--------------------|
-| Binds the directory to an ops0 IaC project | `<cwd>/.ops0/config.json` |
-| Adds a governance section for Claude Code and other agents | `<cwd>/CLAUDE.md` (idempotent, fenced) |
-| Installs `PostToolUse` (IaC scan) + `PreToolUse` (block destroys) hooks | `<cwd>/.claude/settings.json` |
-| Same hooks at user-level so they fire from any workspace Claude Code opens | `~/.claude/settings.json` (gated on `.ops0/config.json` walk-up so unrelated repos aren't scanned) |
-| Registers ops0 as an MCP server with Claude Code | `claude mcp add ops0 …` (best-effort; skips with `--skip-claude`) |
+**How do I let `terraform destroy` through for a planned tear-down?**
+Prefix the command with `OPS0_ALLOW_DESTROY=1`. The block still gets
+logged to the audit trail.
 
-The hook is what gives you actual enforcement: if Claude Code writes a
-non-compliant `.tf` file, the hook fails non-zero and the violation is
-surfaced back to the model so it can remediate before continuing.
+**I deleted `.ops0/config.json`. What happens?**
+The user-level hook walks up and finds nothing, so it exits 0. The
+directory is unbound. Nothing weird happens.
+
+**I have ten projects in one repo. Will the hook know which one?**
+Yes. The CLI walks up from the edited file to find the nearest
+`.ops0/config.json` and uses that project's policies.
+
+**Does this work with anything other than Terraform?**
+Today: Terraform, OpenTofu, and OCI manifests via the `.tf`, `.tofu`,
+`.hcl`, and `.tf.json` extensions. Kubernetes manifests are next.
+
+## Build from source
+
+```bash
+git clone https://github.com/ops0-ai/ops0-cli && cd ops0-cli
+go build -o ops0 ./cmd/ops0
+sudo install -m 0755 ops0 /usr/local/bin/ops0
+```
+
+Requires Go 1.22 or later. The binary statically links everything except
+glibc (Linux) and the system Python that the hook scripts call for JSON
+parsing.
+
+## Contributing
+
+Issues and PRs welcome. A few guardrails:
+
+- Run `go vet ./...` and `go test ./...` before pushing.
+- Keep the CLI tree-shakeable: any new dependency must justify its place.
+- Hook scripts have to work on macOS bash 3.2 and Linux bash 4+. No
+  bashisms beyond what's already in `internal/cmd/init.go`.
+- New telemetry fields require a paired migration in the `config-master`
+  repo. Best-effort writes only; never block the CLI on telemetry.
+
+## Star history
+
+If this is useful to you, star it. It's the cheapest signal that helps
+other teams find it.
 
 ## License
 
