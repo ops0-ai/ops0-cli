@@ -136,6 +136,45 @@ func LoadRepo(repoRoot string) (*RepoConfig, error) {
 	return cfg, nil
 }
 
+// FindRepo walks up from startPath (a directory or a file inside one) looking
+// for the NEAREST `.ops0/config.json`. Returns (cfg, repoRoot, nil) when
+// found, or (nil, "", nil) when no ancestor has one.
+//
+// This is the right resolver for monorepos where each subdirectory was
+// initialized as its own ops0 project. Walking up from the file path means
+// `ops0 policies check dir1/main.tf` and `ops0 policies check dir2/main.tf`
+// resolve to different project IDs even when the CLI was launched from
+// the shared repo root.
+func FindRepo(startPath string) (*RepoConfig, string, error) {
+	if startPath == "" {
+		return nil, "", nil
+	}
+	dir, err := filepath.Abs(startPath)
+	if err != nil {
+		return nil, "", err
+	}
+	// If we were given a file path, start from its containing dir.
+	if info, statErr := os.Stat(dir); statErr == nil && !info.IsDir() {
+		dir = filepath.Dir(dir)
+	}
+
+	for {
+		cfg, err := LoadRepo(dir)
+		if err != nil {
+			return nil, "", err
+		}
+		if cfg != nil {
+			return cfg, dir, nil
+		}
+		parent := filepath.Dir(dir)
+		// filepath.Dir("/") == "/" and filepath.Dir(".") == "." → stop.
+		if parent == dir {
+			return nil, "", nil
+		}
+		dir = parent
+	}
+}
+
 // SaveRepo writes <repo>/.ops0/config.json. Uses 0644 — this file is meant
 // to be readable and committed to git.
 func SaveRepo(repoRoot string, cfg *RepoConfig) error {

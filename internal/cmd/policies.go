@@ -43,8 +43,11 @@ func runPoliciesList(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("not logged in — run `ops0 login` first")
 	}
 
+	// Walk up to find the nearest .ops0/config.json. Lets the user run
+	// `ops0 policies list` from anywhere inside a monorepo subdir and still
+	// get that subproject's policies, not the parent's.
 	cwd, _ := os.Getwd()
-	repoCfg, _ := config.LoadRepo(cwd)
+	repoCfg, _, _ := config.FindRepo(cwd)
 	projectID := ""
 	if repoCfg != nil {
 		projectID = repoCfg.ProjectID
@@ -215,8 +218,22 @@ func runPoliciesCheck(cmd *cobra.Command, args []string) error {
 
 	// Telemetry — best-effort, never blocks.
 	if userCfg.Telemetry {
-		cwd, _ := os.Getwd()
-		hash := sha256.Sum256([]byte(cwd))
+		// Resolve the project from the SCAN TARGET, not CWD. In monorepo
+		// setups (one repo, many ops0 projects), the hook may invoke
+		// `ops0 policies check sub/dir/main.tf` from the parent's CWD —
+		// walking up from the target gets us the right binding.
+		repoCfg, repoRoot, _ := config.FindRepo(target)
+		projectID := ""
+		if repoCfg != nil {
+			projectID = repoCfg.ProjectID
+		}
+		// Hash whichever path is most stable: the bound repo root if we found
+		// one, else the CWD (legacy fallback for unbound runs).
+		hashSrc := repoRoot
+		if hashSrc == "" {
+			hashSrc, _ = os.Getwd()
+		}
+		hash := sha256.Sum256([]byte(hashSrc))
 		violations := make([]api.CheckViolation, 0, len(result.Findings))
 		for _, f := range result.Findings {
 			if f.Status != "failed" {
@@ -233,7 +250,7 @@ func runPoliciesCheck(cmd *cobra.Command, args []string) error {
 			})
 		}
 		_ = client.ReportCheck(&api.CheckReport{
-			ProjectID:  func() string { c, _ := config.LoadRepo(cwd); if c != nil { return c.ProjectID }; return "" }(),
+			ProjectID:  projectID,
 			RepoHash:   hex.EncodeToString(hash[:]),
 			Total:      result.Summary.Passed + result.Summary.Failed,
 			Passed:     result.Summary.Passed,
