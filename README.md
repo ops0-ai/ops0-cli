@@ -60,15 +60,18 @@ run. All audited.
 
 
 
+## API Key
+
+To get an API key, setup an account at https://brew.ops0.ai and then go to https://brew.ops0.ai/settings?tab=api-keys and follow the below steps in the images. 
+
+<img width="1644" height="872" alt="image" src="https://github.com/user-attachments/assets/3dd5053f-6007-4316-9110-08ebff69cf2e" />
+<img width="518" height="459" alt="image" src="https://github.com/user-attachments/assets/da20e110-5983-42a4-a6f3-d2dd8c911c76" />
+
 ## Quick start
 
 ```bash
 # 1. Install
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | sh
-
-# To get an API key, setup an account at https://brew.ops0.ai and then go to https://brew.ops0.ai/settings?tab=api-keys and follow the below steps in the images. 
-<img width="1644" height="872" alt="image" src="https://github.com/user-attachments/assets/3dd5053f-6007-4316-9110-08ebff69cf2e" />
-<img width="518" height="459" alt="image" src="https://github.com/user-attachments/assets/da20e110-5983-42a4-a6f3-d2dd8c911c76" />
 
 # 2. Auth: get a key at https://brew.ops0.ai/settings?tab=api-keys
 ops0 login --api-base https://brew.ops0.ai
@@ -237,7 +240,7 @@ Yes. The CLI walks up from the edited file to find the nearest
 `.ops0/config.json` and uses that project's policies.
 
 **Does this work with anything other than Terraform?**
-Today: Terraform, OpenTofu, and OCI manifests via the `.tf`, `.tofu`,
+Today: Terraform, OpenTofu, and  manifests via the `.tf`, `.tofu`,
 `.hcl`, and `.tf.json` extensions. Kubernetes manifests are next.
 
 ## Build from source
