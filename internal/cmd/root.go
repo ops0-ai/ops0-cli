@@ -49,5 +49,6 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(policiesCmd)
 	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(telemetryCmd)
 	rootCmd.AddCommand(versionCmd)
 }

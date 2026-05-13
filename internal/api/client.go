@@ -132,3 +132,26 @@ func (c *Client) ReportCheck(req *CheckReport) error {
 	resp.Body.Close()
 	return nil
 }
+
+// BlockedCommand is the payload for /telemetry/blocked-command — fired by
+// the PreToolUse hook just before it exits 2 to capture which command was
+// rejected.
+type BlockedCommand struct {
+	Command        string `json:"command"`
+	MatchedPattern string `json:"matchedPattern,omitempty"`
+	Title          string `json:"title,omitempty"`
+	RepoHash       string `json:"repoHash,omitempty"`
+	CLIVersion     string `json:"cliVersion,omitempty"`
+}
+
+// ReportBlockedCommand records a destroy/apply block in the org's audit
+// trail. Like ReportCheck, this is best-effort — the hook still exits 2
+// to block the agent regardless of whether this POST succeeds.
+func (c *Client) ReportBlockedCommand(req *BlockedCommand) error {
+	resp, err := c.do(http.MethodPost, "/api/v1/cli/telemetry/blocked-command", req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}

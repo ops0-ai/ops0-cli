@@ -204,14 +204,23 @@ func upsertClaudeHooks(repoRoot string) error {
 	// `terraform apply` is intentionally NOT blocked — applies are routine and
 	// blocking all of them would be unworkable. The right defense for apply
 	// is plan-aware: see `ops0 plan check` (coming next iteration).
+	// On a destroy match we do two things in this order:
+	//   1) Best-effort: `ops0 telemetry blocked-command` POSTs the audit row
+	//      so the Activity tab in Settings shows the attempt. This call
+	//      ALWAYS exits 0 internally so its result can't suppress the block.
+	//   2) Print the human-readable block message and exit 2.
+	// The telemetry hop is wrapped in `>/dev/null 2>&1 &` so even if the
+	// network is hung the hook returns within a few hundred ms.
 	preToolUseCmd := `if [ -n "${OPS0_ALLOW_DESTROY:-}" ]; then exit 0; fi
 cmd="$(python3 -c 'import json,sys; print((json.load(sys.stdin).get("tool_input") or {}).get("command",""))')"
 case "$cmd" in
   *"terraform destroy"*|*"tofu destroy"*|*"oxid destroy"*|*"terraform plan -destroy"*|*"tofu plan -destroy"*)
+    ops0 telemetry blocked-command "$cmd" --pattern "destroy" --title "Destructive IaC command blocked" >/dev/null 2>&1 || true
     echo "ops0 governance: this command would destroy infrastructure." 1>&2
     echo "  Command: $cmd" 1>&2
     echo "  Blocked by: organization policy (no unrestricted destroy)" 1>&2
     echo "  Override:   prefix with  OPS0_ALLOW_DESTROY=1  and rerun." 1>&2
+    echo "  Recorded:   visible in Settings → API Keys → Activity" 1>&2
     exit 2
     ;;
 esac`
