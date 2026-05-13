@@ -223,9 +223,13 @@ func runPoliciesCheck(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			violations = append(violations, api.CheckViolation{
-				PolicyID: f.CheckID,
-				Severity: f.Severity,
-				Message:  f.CheckName,
+				PolicyID:    f.CheckID,
+				Severity:    f.Severity,
+				Message:     f.CheckName,
+				FilePath:    f.FilePath,
+				LineStart:   f.LineRange.Start,
+				Resource:    f.Resource,
+				Remediation: f.Guideline,
 			})
 		}
 		_ = client.ReportCheck(&api.CheckReport{

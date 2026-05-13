@@ -50,7 +50,11 @@ type CheckReport struct {
 }
 
 type CheckViolation struct {
-	PolicyID string `json:"policyId"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
+	PolicyID    string `json:"policyId"`
+	Severity    string `json:"severity"`
+	Message     string `json:"message"`
+	FilePath    string `json:"filePath,omitempty"`
+	LineStart   int    `json:"lineStart,omitempty"`
+	Resource    string `json:"resource,omitempty"`
+	Remediation string `json:"remediation,omitempty"`
 }
