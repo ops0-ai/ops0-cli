@@ -167,6 +167,10 @@ type ValidateReport struct {
 	Budget     *BudgetSection    `json:"budget,omitempty"`
 	RepoHash   string            `json:"repoHash,omitempty"`
 	CLIVersion string            `json:"cliVersion,omitempty"`
+	// ProjectID identifies the ops0 IaC project the scanned files belong
+	// to. Resolved via FindRepo on the file path. Persisted server-side
+	// so the Activity tab can link audit rows back to the project.
+	ProjectID  string            `json:"projectId,omitempty"`
 }
 
 // ReportValidate records validate + tflint findings against the user's API

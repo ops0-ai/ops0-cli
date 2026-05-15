@@ -143,6 +143,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			Budget:     result.Budget,
 			RepoHash:   hex.EncodeToString(hash[:]),
 			CLIVersion: buildVersion,
+			ProjectID:  projectID,
 		})
 	}
 
