@@ -155,3 +155,26 @@ func (c *Client) ReportBlockedCommand(req *BlockedCommand) error {
 	resp.Body.Close()
 	return nil
 }
+
+// ValidateReport is what /telemetry/validate expects.
+// Mirrors ValidateResponse plus repo/version metadata. tflint may be nil
+// (lint stage unavailable / errored).
+type ValidateReport struct {
+	Validate   ValidateSection   `json:"validate"`
+	Tflint     *TflintScanResult `json:"tflint,omitempty"`
+	RepoHash   string            `json:"repoHash,omitempty"`
+	CLIVersion string            `json:"cliVersion,omitempty"`
+}
+
+// ReportValidate records validate + tflint findings against the user's API
+// key so they show up in Settings -> Activity. Best-effort like the other
+// telemetry calls; the CLI still surfaces the failure to the agent via
+// non-zero exit regardless of what this returns.
+func (c *Client) ReportValidate(req *ValidateReport) error {
+	resp, err := c.do(http.MethodPost, "/api/v1/cli/telemetry/validate", req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}

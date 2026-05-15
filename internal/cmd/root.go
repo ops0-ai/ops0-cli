@@ -48,6 +48,7 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(policiesCmd)
+	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(mcpCmd)
 	rootCmd.AddCommand(telemetryCmd)
 	rootCmd.AddCommand(versionCmd)

@@ -186,7 +186,7 @@ func upsertClaudeHooks(repoRoot string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseProjectCmd, preToolUseCmd)
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseProjectCmd, preToolUseCmd, stopHookCmd)
 }
 
 // upsertUserClaudeHooks writes the same destroy block and IaC policy check to
@@ -211,8 +211,36 @@ func upsertUserClaudeHooks() error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseUserCmd, preToolUseCmd)
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseUserCmd, preToolUseCmd, stopHookCmd)
 }
+
+// ── Stop hook: end-of-turn full validate ─────────────────────────────────────
+//
+// Fires when Claude finishes its response. We run the heavy pipeline
+// (init + validate + tflint) once per turn rather than per file edit —
+// init can take 5-30s for provider download, so per-edit would be brutal.
+//
+// Gating: only fire if a .ops0/config.json exists in CWD's ancestry. If the
+// workspace isn't ops0-bound we exit 0 immediately. This avoids running
+// validation on every Claude turn in unrelated repos.
+const stopHookCmd = `# ops0 Stop hook — end-of-turn IaC validate + tflint.
+# Walk up from CWD looking for .ops0/config.json. If not found, no-op.
+d="$PWD"
+found=""
+while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do
+  if [ -f "$d/.ops0/config.json" ]; then found="$d"; break; fi
+  d="$(dirname "$d")"
+done
+if [ -z "$found" ]; then exit 0; fi
+# Only run if .tf/.tofu/.hcl files in the bound dir were touched in the
+# last 5 minutes — proxy for "the agent worked on IaC this turn."
+if ! find "$found" -type f \( -name "*.tf" -o -name "*.tofu" -o -name "*.hcl" -o -name "*.tf.json" \) -mmin -5 2>/dev/null | grep -q .; then
+  exit 0
+fi
+# Run the validation. Non-zero exit surfaces stderr to the model so it
+# self-remediates the failure.
+ops0 validate "$found" 1>&2 || exit 2
+`
 
 // ── Hook command strings ─────────────────────────────────────────────────────
 //
@@ -268,15 +296,19 @@ case "$cmd" in
     ;;
 esac`
 
-// writeClaudeHooks merges ops0 PostToolUse / PreToolUse hooks into an
-// arbitrary Claude Code settings.json (project-level or user-level). Used
-// by both upsertClaudeHooks (repo's .claude/settings.json) and
+// writeClaudeHooks merges ops0 PostToolUse / PreToolUse / Stop hooks into
+// an arbitrary Claude Code settings.json (project-level or user-level).
+// Used by both upsertClaudeHooks (repo's .claude/settings.json) and
 // upsertUserClaudeHooks (~/.claude/settings.json).
 //
 // The `_ops0: true` sentinel on each entry lets us re-run init without
 // accumulating duplicate hook entries — we strip our prior entries and
 // re-append.
-func writeClaudeHooks(path, postCmd, preCmd string) error {
+//
+// PostToolUse — per-edit lightweight scan
+// PreToolUse  — block destroy commands
+// Stop        — end-of-turn init+validate+tflint
+func writeClaudeHooks(path, postCmd, preCmd, stopCmd string) error {
 	var settings map[string]any
 	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, &settings)
@@ -290,6 +322,8 @@ func writeClaudeHooks(path, postCmd, preCmd string) error {
 		hooks = map[string]any{}
 	}
 
+	// Stop events have no `matcher` field — they fire on every turn end.
+	// PostToolUse / PreToolUse use a matcher to scope by tool name.
 	upsertEntry := func(event string, matcher string, cmd string) {
 		arr, _ := hooks[event].([]any)
 		filtered := make([]any, 0, len(arr)+1)
@@ -300,18 +334,22 @@ func writeClaudeHooks(path, postCmd, preCmd string) error {
 			}
 			filtered = append(filtered, item)
 		}
-		filtered = append(filtered, map[string]any{
-			"_ops0":   true,
-			"matcher": matcher,
+		entry := map[string]any{
+			"_ops0": true,
 			"hooks": []any{
 				map[string]any{"type": "command", "command": cmd},
 			},
-		})
+		}
+		if matcher != "" {
+			entry["matcher"] = matcher
+		}
+		filtered = append(filtered, entry)
 		hooks[event] = filtered
 	}
 
 	upsertEntry("PostToolUse", "Edit|Write|MultiEdit", postCmd)
 	upsertEntry("PreToolUse", "Bash", preCmd)
+	upsertEntry("Stop", "", stopCmd)
 	settings["hooks"] = hooks
 
 	out, err := json.MarshalIndent(settings, "", "  ")
