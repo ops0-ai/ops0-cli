@@ -28,10 +28,12 @@ var initCmd = &cobra.Command{
                                 policy set.
   CLAUDE.md                     A fenced governance section is appended (or refreshed)
                                 instructing agents to call ops0 before generating IaC.
-  .claude/settings.json         A PostToolUse hook is installed for .tf / .tofu / .hcl
-                                Edit/Write events. After the agent writes IaC, the hook
-                                runs 'ops0 policies check <file>' and fails non-zero if
-                                any violation is found, forcing the agent to remediate.
+  .claude/settings.json         A Stop hook is installed. When the agent finishes a turn,
+                                'ops0 validate' runs against the working directory and
+                                fails non-zero on any policy / lint / cost / budget
+                                violation, forcing the agent to remediate. A PreToolUse
+                                hook blocks 'terraform destroy' / 'tofu destroy' /
+                                'oxid destroy' before they run.
   Claude Code MCP registration  Best-effort: if 'claude' is on PATH we register the
                                 ops0 MCP server so the agent can call list_policies
                                 and check_compliance natively. Skip with --skip-claude.
@@ -76,7 +78,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		if err := upsertClaudeHooks(cwd); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not install Claude Code hooks: %v\n", err)
 		} else {
-			fmt.Fprintln(cmd.OutOrStdout(), "✓ Installed .claude/settings.json PostToolUse hook for IaC files")
+			fmt.Fprintln(cmd.OutOrStdout(), "✓ Installed .claude/settings.json hooks (Stop + PreToolUse)")
 		}
 
 		// User-level hooks: same destroy block + gated policy check.
@@ -116,27 +118,35 @@ func upsertClaudeMd(repoRoot string) error {
 	block := begin + `
 ## ops0 Governance (auto-managed by ` + "`ops0 init`" + `)
 
-This repository is governed by [ops0](https://brew.ops0.ai). **Before
-generating or modifying Infrastructure-as-Code (Terraform / OpenTofu / Oxid)
-in this repository:**
+This repository is governed by [ops0](https://brew.ops0.ai). The gate fires
+**once per turn**, when you finish writing — not on every individual file
+save. Write the whole module in whatever order makes sense, declare
+variables / outputs / resources however you like, then stop. The
+` + "`Stop`" + ` hook in ` + "`.claude/settings.json`" + ` runs
+` + "`ops0 validate`" + ` against the complete working directory:
+
+  syntax validation → lint → policy + vulnerability scan → cost estimate →
+  project budget check
+
+Any failure exits non-zero and the violations are surfaced back to you.
+**Treat that the same as a failing test** — fix the issues and try again.
+The hook runs again on your next turn end.
+
+Other things to know:
 
 1. Call ` + "`list_policies`" + ` on the ops0 MCP server (or run
-   ` + "`ops0 policies list`" + ` in a shell) to see the rules that apply.
-2. After writing any ` + "`.tf` / `.tofu` / `.hcl` / `.tfvars`" + ` file, the
-   ` + "`PostToolUse`" + ` hook in ` + "`.claude/settings.json`" + ` runs
-   ` + "`ops0 validate`" + ` against the working directory. The pipeline is
-   syntax validation → lint → policy + vulnerability scan → cost estimate →
-   project budget check. Any failure exits non-zero and the violation is
-   surfaced back to you. **Treat that the same as a failing test** — fix it
-   before considering the task complete.
-3. Destructive Bash commands (` + "`terraform destroy`" + `, ` + "`tofu destroy`" + `,
+   ` + "`ops0 policies list`" + ` in a shell) to see the rules that apply
+   before generating IaC. Reading the rules first usually means fewer
+   round trips through the gate.
+2. Destructive Bash commands (` + "`terraform destroy`" + `, ` + "`tofu destroy`" + `,
    ` + "`oxid destroy`" + `) are blocked by the ` + "`PreToolUse`" + ` hook
-   before they run. To intentionally tear down a sandbox, prefix the command
-   with ` + "`OPS0_ALLOW_DESTROY=1`" + `.
-4. After every run, the consolidated report is rewritten at
+   before they run. This is a runtime safety gate, not part of validate.
+   To intentionally tear down a sandbox, prefix the command with
+   ` + "`OPS0_ALLOW_DESTROY=1`" + `.
+3. After every validate run, the consolidated report is rewritten at
    ` + "`ops0-scan.md`" + ` at the repo root. Read this file to see the
-   current state of findings across all stages without re-running validate.
-   Do NOT hand-edit it — it's regenerated on every tool call.
+   current state of findings without re-running validate yourself. Do
+   NOT hand-edit it — it's regenerated on every turn.
 
 The ` + "`.ops0/config.json`" + ` file binds this repo to an ops0 project.
 Org-wide policies always apply; project-specific policies apply when the repo
@@ -195,7 +205,7 @@ func upsertClaudeHooks(repoRoot string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseProjectCmd, preToolUseCmd, stopHookCmd)
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), preToolUseCmd, stopHookCmd)
 }
 
 // upsertUserClaudeHooks writes the same destroy block and IaC policy check to
@@ -220,7 +230,7 @@ func upsertUserClaudeHooks() error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeClaudeHooks(filepath.Join(dir, "settings.json"), postToolUseUserCmd, preToolUseCmd, stopHookCmd)
+	return writeClaudeHooks(filepath.Join(dir, "settings.json"), preToolUseCmd, stopHookCmd)
 }
 
 // ── Stop hook: end-of-turn full validate ─────────────────────────────────────
@@ -253,36 +263,11 @@ ops0 validate "$found" 1>&2 || exit 2
 
 // ── Hook command strings ─────────────────────────────────────────────────────
 //
-// Claude Code's PostToolUse hook passes a JSON payload on STDIN with
-// `tool_input.file_path` (Edit/Write) and `tool_response.filePath`
-// (newer schema variant). There's no $CLAUDE_FILE_PATHS env var
-// despite what older docs suggest — we parse the JSON via python3
-// (universal on macOS/Linux, no extra brew install required).
-//
-// PostToolUse now runs `ops0 validate <bound-dir>` rather than a
-// lightweight scan. That gives us four things for free:
-//   1. terraform validate parses HCL — so syntax breaks (missing `=`,
-//      mismatched braces) exit non-zero immediately. The previous
-//      scan-only flow silently returned 0 findings on unparseable input.
-//   2. tflint runs — catches provider-aware issues (wrong instance types,
-//      deprecated args, missing version constraints).
-//   3. The org's security policies still run server-side as part of the
-//      pipeline.
-//   4. Findings get persisted to the audit trail via /telemetry/validate.
-//
-// File extensions covered: .tf, .tofu, .hcl, .tf.json, .tfvars,
-// .tfvars.json. .tfvars are variable inputs to terraform validate.
-
-// Project-level: when an IaC file is written, validate the whole bound
-// directory. The repo root for project-level hooks is by definition the
-// CWD where `ops0 init` ran, so we just call `ops0 validate` with no
-// argument and let it walk up from the file's dir to find .ops0/config.json.
-const postToolUseProjectCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json|*.tfvars|*.tfvars.json) ops0 validate "$f" 1>&2 || exit 2 ;; esac`
-
-// User-level variant. Walks up from the file's dir looking for
-// `.ops0/config.json` so we only validate ops0-bound repos. If the file
-// isn't IaC or no binding is found, exit 0 (no-op).
-const postToolUseUserCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json|*.tfvars|*.tfvars.json) d="$(dirname "$f")"; while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do if [ -f "$d/.ops0/config.json" ]; then ops0 validate "$d" 1>&2 || exit 2; exit 0; fi; d="$(dirname "$d")"; done ;; esac`
+// As of v0.5.21 we install only two hooks: PreToolUse (destroy block) and
+// Stop (end-of-turn full validate). The PostToolUse per-edit gate was
+// removed because validating a half-written module produced noise and
+// imposed unnatural authoring order on the agent. Validation now runs
+// once, against the complete module, when the agent finishes its turn.
 
 // ── PreToolUse: block destructive IaC commands BEFORE they run ───────────
 //
@@ -318,19 +303,24 @@ case "$cmd" in
     ;;
 esac`
 
-// writeClaudeHooks merges ops0 PostToolUse / PreToolUse / Stop hooks into
-// an arbitrary Claude Code settings.json (project-level or user-level).
-// Used by both upsertClaudeHooks (repo's .claude/settings.json) and
+// writeClaudeHooks merges ops0 PreToolUse + Stop hooks into an arbitrary
+// Claude Code settings.json (project-level or user-level). Used by both
+// upsertClaudeHooks (repo's .claude/settings.json) and
 // upsertUserClaudeHooks (~/.claude/settings.json).
 //
-// The `_ops0: true` sentinel on each entry lets us re-run init without
-// accumulating duplicate hook entries — we strip our prior entries and
-// re-append.
+// As of v0.5.21 we no longer install a PostToolUse hook. Per-edit gating
+// on a half-written module was noisy and forced unnatural authoring order
+// on the agent. Validation now runs once per agent turn via the Stop
+// hook, against the complete working directory.
 //
-// PostToolUse — per-edit lightweight scan
-// PreToolUse  — block destroy commands
-// Stop        — end-of-turn init+validate+tflint
-func writeClaudeHooks(path, postCmd, preCmd, stopCmd string) error {
+// The `_ops0: true` sentinel on each entry lets us re-run init without
+// accumulating duplicate hooks. For PostToolUse specifically we STRIP
+// any prior `_ops0` entry without re-adding one, so users who upgrade
+// via `ops0 init --force` lose the old per-edit gate cleanly.
+//
+// PreToolUse — block destroy commands (runtime safety, separate concern)
+// Stop       — end-of-turn full pipeline (validate, lint, scan, cost, budget)
+func writeClaudeHooks(path, preCmd, stopCmd string) error {
 	var settings map[string]any
 	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, &settings)
@@ -344,8 +334,27 @@ func writeClaudeHooks(path, postCmd, preCmd, stopCmd string) error {
 		hooks = map[string]any{}
 	}
 
-	// Stop events have no `matcher` field — they fire on every turn end.
-	// PostToolUse / PreToolUse use a matcher to scope by tool name.
+	// removeOps0Entries strips every prior `_ops0` entry from the named
+	// event. Used to garbage-collect the old PostToolUse hook on upgrade.
+	removeOps0Entries := func(event string) {
+		arr, _ := hooks[event].([]any)
+		filtered := make([]any, 0, len(arr))
+		for _, item := range arr {
+			m, ok := item.(map[string]any)
+			if ok && m["_ops0"] == true {
+				continue
+			}
+			filtered = append(filtered, item)
+		}
+		if len(filtered) == 0 {
+			delete(hooks, event)
+		} else {
+			hooks[event] = filtered
+		}
+	}
+
+	// upsertEntry replaces any prior `_ops0` entry on this event with our
+	// fresh one. Stop has no matcher; PreToolUse uses Bash.
 	upsertEntry := func(event string, matcher string, cmd string) {
 		arr, _ := hooks[event].([]any)
 		filtered := make([]any, 0, len(arr)+1)
@@ -369,7 +378,10 @@ func writeClaudeHooks(path, postCmd, preCmd, stopCmd string) error {
 		hooks[event] = filtered
 	}
 
-	upsertEntry("PostToolUse", "Edit|Write|MultiEdit", postCmd)
+	// On upgrade: drop the old PostToolUse hook entirely. We do NOT
+	// re-add it — Stop is the new (and only) validation gate.
+	removeOps0Entries("PostToolUse")
+
 	upsertEntry("PreToolUse", "Bash", preCmd)
 	upsertEntry("Stop", "", stopCmd)
 	settings["hooks"] = hooks
