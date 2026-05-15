@@ -250,17 +250,30 @@ ops0 validate "$found" 1>&2 || exit 2
 // despite what older docs suggest — we parse the JSON via python3
 // (universal on macOS/Linux, no extra brew install required).
 //
-// Filter to IaC extensions so we don't run the scanner on every Edit.
-// Send `ops0` output to stderr so Claude Code surfaces it back to the
-// agent when we exit non-zero (exit 2 = "block this tool call, show
-// stderr to model" per Claude Code's hook contract).
-const postToolUseProjectCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) ops0 policies check "$f" 1>&2 || exit 2 ;; esac`
+// PostToolUse now runs `ops0 validate <bound-dir>` rather than a
+// lightweight scan. That gives us four things for free:
+//   1. terraform validate parses HCL — so syntax breaks (missing `=`,
+//      mismatched braces) exit non-zero immediately. The previous
+//      scan-only flow silently returned 0 findings on unparseable input.
+//   2. tflint runs — catches provider-aware issues (wrong instance types,
+//      deprecated args, missing version constraints).
+//   3. The org's security policies still run server-side as part of the
+//      pipeline.
+//   4. Findings get persisted to the audit trail via /telemetry/validate.
+//
+// File extensions covered: .tf, .tofu, .hcl, .tf.json, .tfvars,
+// .tfvars.json. .tfvars are variable inputs to terraform validate.
 
-// User-level variant. Same idea, but walks up from the file's directory
-// looking for `.ops0/config.json` so we only run the scanner against
-// ops0-bound repos. If the file isn't IaC or we can't find a binding,
-// exit 0 (no-op).
-const postToolUseUserCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json) d="$(dirname "$f")"; while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do if [ -f "$d/.ops0/config.json" ]; then ops0 policies check "$f" 1>&2 || exit 2; exit 0; fi; d="$(dirname "$d")"; done ;; esac`
+// Project-level: when an IaC file is written, validate the whole bound
+// directory. The repo root for project-level hooks is by definition the
+// CWD where `ops0 init` ran, so we just call `ops0 validate` with no
+// argument and let it walk up from the file's dir to find .ops0/config.json.
+const postToolUseProjectCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json|*.tfvars|*.tfvars.json) ops0 validate "$f" 1>&2 || exit 2 ;; esac`
+
+// User-level variant. Walks up from the file's dir looking for
+// `.ops0/config.json` so we only validate ops0-bound repos. If the file
+// isn't IaC or no binding is found, exit 0 (no-op).
+const postToolUseUserCmd = `f="$(python3 -c 'import json,sys; d=json.load(sys.stdin); ti=d.get("tool_input") or {}; tr=d.get("tool_response") or {}; print(ti.get("file_path") or tr.get("filePath") or "")')" ; case "$f" in *.tf|*.tofu|*.hcl|*.tf.json|*.tfvars|*.tfvars.json) d="$(dirname "$f")"; while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do if [ -f "$d/.ops0/config.json" ]; then ops0 validate "$d" 1>&2 || exit 2; exit 0; fi; d="$(dirname "$d")"; done ;; esac`
 
 // ── PreToolUse: block destructive IaC commands BEFORE they run ───────────
 //

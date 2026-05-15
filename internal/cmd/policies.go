@@ -149,7 +149,15 @@ func collectIacFiles(root string) ([]api.CheckFile, error) {
 			return nil
 		}
 		name := strings.ToLower(d.Name())
-		if !(strings.HasSuffix(name, ".tf") || strings.HasSuffix(name, ".tofu") || strings.HasSuffix(name, ".hcl") || strings.HasSuffix(name, ".tf.json")) {
+		// .tfvars / .tfvars.json are not scanned for security but they ARE
+		// inputs to terraform validate, so include them so the validate
+		// pipeline sees the same files the agent just wrote.
+		if !(strings.HasSuffix(name, ".tf") ||
+			strings.HasSuffix(name, ".tofu") ||
+			strings.HasSuffix(name, ".hcl") ||
+			strings.HasSuffix(name, ".tf.json") ||
+			strings.HasSuffix(name, ".tfvars") ||
+			strings.HasSuffix(name, ".tfvars.json")) {
 			return nil
 		}
 		body, err := os.ReadFile(path)
