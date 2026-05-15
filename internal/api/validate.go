@@ -24,11 +24,55 @@ type ValidateRequest struct {
 }
 
 // ValidateResponse is the JSON shape returned by the server.
+//
+// `Scan` is the Checkov-style security scan that the server now runs as
+// part of the pipeline. May be nil if the scan step failed — we don't
+// fail the whole call when only scan fails, so the CLI gets validate +
+// tflint results regardless.
 type ValidateResponse struct {
-	OK       bool             `json:"ok"`
-	Validate ValidateSection  `json:"validate"`
+	OK       bool              `json:"ok"`
+	Validate ValidateSection   `json:"validate"`
 	Tflint   *TflintScanResult `json:"tflint,omitempty"`
-	Error    string           `json:"error,omitempty"`
+	Scan     *ScanSection      `json:"scan,omitempty"`
+	Error    string            `json:"error,omitempty"`
+}
+
+// ScanSection mirrors the shape returned by iac-service /internal/scan-files
+// (which is what the server fans out to). We only model the fields the CLI
+// renders; the rest is parsed lazily as `any` when needed.
+type ScanSection struct {
+	Findings             []ScanFinding `json:"findings"`
+	Summary              ScanSummary   `json:"summary"`
+	SeverityDistribution struct {
+		Critical int `json:"critical"`
+		High     int `json:"high"`
+		Medium   int `json:"medium"`
+		Low      int `json:"low"`
+		Unknown  int `json:"unknown"`
+	} `json:"severityDistribution"`
+	CheckovVersion string `json:"checkovVersion,omitempty"`
+}
+
+type ScanSummary struct {
+	Passed        int `json:"passed"`
+	Failed        int `json:"failed"`
+	Skipped       int `json:"skipped"`
+	ParsingErrors int `json:"parsingErrors"`
+}
+
+type ScanFinding struct {
+	CheckID         string `json:"checkId"`
+	CheckName       string `json:"checkName"`
+	Severity        string `json:"severity"`
+	Status          string `json:"status"`
+	Resource        string `json:"resource"`
+	ResourceAddress string `json:"resourceAddress,omitempty"`
+	FilePath        string `json:"filePath"`
+	LineRange       struct {
+		Start int `json:"start"`
+		End   int `json:"end"`
+	} `json:"lineRange"`
+	Guideline string `json:"guideline,omitempty"`
 }
 
 type ValidateSection struct {

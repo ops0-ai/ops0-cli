@@ -26,6 +26,7 @@ var (
 	validateIacType    string
 	validateProvider   string
 	validateFailOnWarn bool
+	validateScanFailOn string
 )
 
 var validateCmd = &cobra.Command{
@@ -52,6 +53,7 @@ func init() {
 	validateCmd.Flags().StringVar(&validateIacType, "iac-type", "terraform", "IaC flavor: terraform | opentofu | oxid")
 	validateCmd.Flags().StringVar(&validateProvider, "cloud", "", "Cloud provider hint for tflint plugins: aws | gcp | azure | oracle")
 	validateCmd.Flags().BoolVar(&validateFailOnWarn, "fail-on-warning", false, "Also exit non-zero on tflint warnings (default: errors only)")
+	validateCmd.Flags().StringVar(&validateScanFailOn, "scan-fail-on", "high", "Severity threshold for security scan findings: critical | high | medium | low")
 }
 
 func runValidate(cmd *cobra.Command, args []string) error {
@@ -111,12 +113,11 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Telemetry — best-effort, never blocks. We only post if there's
-	// something to record (validate failure or tflint findings). A clean
-	// run doesn't produce a row, matching how `policies check` only ships
-	// failed findings.
+	// something to record (validate failure, tflint findings, or scan
+	// findings). A clean run doesn't produce a row.
 	if userCfg.Telemetry && shouldReportValidate(result) {
 		repoCfg, repoRoot, _ := config.FindRepo(target)
-		_ = repoCfg // currently only used for the hash; left for future use
+		_ = repoCfg
 		hashSrc := repoRoot
 		if hashSrc == "" {
 			hashSrc, _ = os.Getwd()
@@ -125,15 +126,17 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		_ = client.ReportValidate(&api.ValidateReport{
 			Validate:   result.Validate,
 			Tflint:     result.Tflint,
+			Scan:       result.Scan,
 			RepoHash:   hex.EncodeToString(hash[:]),
 			CLIVersion: buildVersion,
 		})
 	}
 
 	// Exit rules:
-	//   - terraform validate failed     -> exit 1 (always)
-	//   - tflint errors > 0             -> exit 1
+	//   - terraform validate failed              -> exit 1 (always)
+	//   - tflint errors > 0                      -> exit 1
 	//   - tflint warnings > 0 + --fail-on-warning -> exit 1
+	//   - security scan finding at/above --scan-fail-on -> exit 1
 	hardFail := !result.Validate.Valid
 	if result.Tflint != nil {
 		if result.Tflint.Summary.Errors > 0 {
@@ -143,10 +146,40 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			hardFail = true
 		}
 	}
+	if result.Scan != nil && scanHasBlockingFinding(result.Scan, validateScanFailOn) {
+		hardFail = true
+	}
 	if hardFail {
 		os.Exit(1)
 	}
 	return nil
+}
+
+// scanHasBlockingFinding returns true if any failed Checkov finding is at
+// or above the configured severity threshold. Also blocks on parsing
+// errors so that a syntactically broken file caught by Checkov (not just
+// terraform validate) doesn't sneak through.
+func scanHasBlockingFinding(s *api.ScanSection, threshold string) bool {
+	if s == nil {
+		return false
+	}
+	if s.Summary.ParsingErrors > 0 {
+		return true
+	}
+	rank := map[string]int{"low": 1, "medium": 2, "high": 3, "critical": 4}
+	min := rank[strings.ToLower(threshold)]
+	if min == 0 {
+		min = rank["high"]
+	}
+	for _, f := range s.Findings {
+		if f.Status != "failed" {
+			continue
+		}
+		if rank[strings.ToLower(f.Severity)] >= min {
+			return true
+		}
+	}
+	return false
 }
 
 // printValidateResult renders the validate + tflint sections in a compact
@@ -172,36 +205,85 @@ func printValidateResult(cmd *cobra.Command, r *api.ValidateResponse, target str
 	// tflint block
 	if r.Tflint == nil {
 		fmt.Fprintln(out, "\ntflint: unavailable")
-		return
-	}
-	t := r.Tflint
-	fmt.Fprintf(out, "\ntflint: %d error(s), %d warning(s), %d notice(s)\n",
-		t.Summary.Errors, t.Summary.Warnings, t.Summary.Notices)
+	} else {
+		t := r.Tflint
+		fmt.Fprintf(out, "\ntflint: %d error(s), %d warning(s), %d notice(s)\n",
+			t.Summary.Errors, t.Summary.Warnings, t.Summary.Notices)
 
-	if len(t.Findings) == 0 {
+		if len(t.Findings) > 0 {
+			max := 20
+			if len(t.Findings) < max {
+				max = len(t.Findings)
+			}
+			for i := 0; i < max; i++ {
+				f := t.Findings[i]
+				loc := f.FilePath
+				if f.LineRange.Start > 0 {
+					loc = fmt.Sprintf("%s:%d", f.FilePath, f.LineRange.Start)
+				}
+				fmt.Fprintf(out, "  [%s] %s: %s (%s)\n", strings.ToUpper(f.Severity), f.RuleName, f.Message, loc)
+			}
+			if len(t.Findings) > max {
+				fmt.Fprintf(out, "  ...and %d more (use --format=json to see all)\n", len(t.Findings)-max)
+			}
+		}
+	}
+
+	// scan (Checkov) block — printed last because it tends to be the
+	// noisiest and the agent should read validate + tflint first.
+	if r.Scan == nil {
+		fmt.Fprintln(out, "\nscan: unavailable")
 		return
 	}
-	// Print up to ~20 most severe findings so the model isn't flooded.
-	max := 20
-	if len(t.Findings) < max {
-		max = len(t.Findings)
+	s := r.Scan
+	fmt.Fprintf(out, "\nscan: %d passed, %d failed (%d parsing errors). Severity: %dC / %dH / %dM / %dL\n",
+		s.Summary.Passed, s.Summary.Failed, s.Summary.ParsingErrors,
+		s.SeverityDistribution.Critical, s.SeverityDistribution.High,
+		s.SeverityDistribution.Medium, s.SeverityDistribution.Low)
+
+	// Print up to ~30 failed findings ranked by severity so the agent sees
+	// the worst issues first when output gets truncated by Claude Code.
+	failed := make([]api.ScanFinding, 0, len(s.Findings))
+	for _, f := range s.Findings {
+		if f.Status == "failed" {
+			failed = append(failed, f)
+		}
+	}
+	rank := map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
+	sortByRank(failed, rank)
+
+	max := 30
+	if len(failed) < max {
+		max = len(failed)
 	}
 	for i := 0; i < max; i++ {
-		f := t.Findings[i]
+		f := failed[i]
 		loc := f.FilePath
 		if f.LineRange.Start > 0 {
 			loc = fmt.Sprintf("%s:%d", f.FilePath, f.LineRange.Start)
 		}
-		fmt.Fprintf(out, "  [%s] %s — %s (%s)\n", strings.ToUpper(f.Severity), f.RuleName, f.Message, loc)
+		fmt.Fprintf(out, "  [%s] %s: %s (%s — %s)\n",
+			strings.ToUpper(f.Severity), f.CheckID, f.CheckName, f.Resource, loc)
 	}
-	if len(t.Findings) > max {
-		fmt.Fprintf(out, "  ...and %d more (use --format=json to see all)\n", len(t.Findings)-max)
+	if len(failed) > max {
+		fmt.Fprintf(out, "  ...and %d more (use --format=json to see all)\n", len(failed)-max)
+	}
+}
+
+// sortByRank is an in-place insertion sort over the severity rank map.
+// Small N (typically dozens of findings), so the simpler algorithm wins.
+func sortByRank(findings []api.ScanFinding, rank map[string]int) {
+	for i := 1; i < len(findings); i++ {
+		for j := i; j > 0 && rank[strings.ToLower(findings[j].Severity)] < rank[strings.ToLower(findings[j-1].Severity)]; j-- {
+			findings[j], findings[j-1] = findings[j-1], findings[j]
+		}
 	}
 }
 
 // shouldReportValidate returns true if the response contains anything worth
-// putting in the audit trail: a failed validate, or any tflint finding.
-// A clean pipeline produces no row.
+// putting in the audit trail: a failed validate, any tflint finding, any
+// failed scan finding, or scan parsing errors. A clean pipeline produces
+// no row.
 func shouldReportValidate(r *api.ValidateResponse) bool {
 	if r == nil {
 		return false
@@ -211,6 +293,11 @@ func shouldReportValidate(r *api.ValidateResponse) bool {
 	}
 	if r.Tflint != nil && len(r.Tflint.Findings) > 0 {
 		return true
+	}
+	if r.Scan != nil {
+		if r.Scan.Summary.ParsingErrors > 0 || r.Scan.Summary.Failed > 0 {
+			return true
+		}
 	}
 	return false
 }

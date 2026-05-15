@@ -157,11 +157,12 @@ func (c *Client) ReportBlockedCommand(req *BlockedCommand) error {
 }
 
 // ValidateReport is what /telemetry/validate expects.
-// Mirrors ValidateResponse plus repo/version metadata. tflint may be nil
-// (lint stage unavailable / errored).
+// Mirrors ValidateResponse plus repo/version metadata. tflint / scan may
+// be nil if those stages were unavailable / errored.
 type ValidateReport struct {
 	Validate   ValidateSection   `json:"validate"`
 	Tflint     *TflintScanResult `json:"tflint,omitempty"`
+	Scan       *ScanSection      `json:"scan,omitempty"`
 	RepoHash   string            `json:"repoHash,omitempty"`
 	CLIVersion string            `json:"cliVersion,omitempty"`
 }
