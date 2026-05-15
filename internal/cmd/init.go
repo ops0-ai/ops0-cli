@@ -242,23 +242,40 @@ func upsertUserClaudeHooks() error {
 // Gating: only fire if a .ops0/config.json exists in CWD's ancestry. If the
 // workspace isn't ops0-bound we exit 0 immediately. This avoids running
 // validation on every Claude turn in unrelated repos.
-const stopHookCmd = `# ops0 Stop hook — end-of-turn IaC validate + tflint.
-# Walk up from CWD looking for .ops0/config.json. If not found, no-op.
+const stopHookCmd = `# ops0 Stop hook — end-of-turn IaC validate.
+#
+# Find the ops0-bound directory to validate. Two cases to handle:
+#   1. CWD itself (or an ancestor) has .ops0/config.json → walk up.
+#   2. CWD is a parent workspace and the binding lives in a subdir
+#      (very common: open Claude Code at the repo root, bind the
+#      terraform/ subdir to a project) → walk down.
+#
+# Walk up first; if nothing found, scan descendants up to depth 5 and
+# take the nearest one. With one binding per workspace this is
+# unambiguous; with multiple bindings under one CWD we pick the
+# shallowest (covers the largest scope).
+set +e
+target=""
 d="$PWD"
-found=""
 while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do
-  if [ -f "$d/.ops0/config.json" ]; then found="$d"; break; fi
+  if [ -f "$d/.ops0/config.json" ]; then target="$d"; break; fi
   d="$(dirname "$d")"
 done
-if [ -z "$found" ]; then exit 0; fi
-# Only run if .tf/.tofu/.hcl files in the bound dir were touched in the
-# last 5 minutes — proxy for "the agent worked on IaC this turn."
-if ! find "$found" -type f \( -name "*.tf" -o -name "*.tofu" -o -name "*.hcl" -o -name "*.tf.json" \) -mmin -5 2>/dev/null | grep -q .; then
+if [ -z "$target" ]; then
+  cfg="$(find "$PWD" -maxdepth 5 -type f -path '*/.ops0/config.json' 2>/dev/null | head -1)"
+  if [ -n "$cfg" ]; then target="$(dirname "$(dirname "$cfg")")"; fi
+fi
+if [ -z "$target" ]; then exit 0; fi
+# Only validate when something IaC-shaped was touched in the last
+# 15 minutes — proxy for "the agent worked on IaC this turn." Long
+# turns (Stop after several minutes of chat) still trip the gate;
+# the previous 5-minute window was too tight for that.
+if ! find "$target" -type f \( -name '*.tf' -o -name '*.tofu' -o -name '*.hcl' -o -name '*.tfvars' -o -name '*.tf.json' \) -mmin -15 2>/dev/null | grep -q .; then
   exit 0
 fi
 # Run the validation. Non-zero exit surfaces stderr to the model so it
 # self-remediates the failure.
-ops0 validate "$found" 1>&2 || exit 2
+ops0 validate "$target" 1>&2 || exit 2
 `
 
 // ── Hook command strings ─────────────────────────────────────────────────────
