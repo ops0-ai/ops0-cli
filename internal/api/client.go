@@ -163,6 +163,8 @@ type ValidateReport struct {
 	Validate   ValidateSection   `json:"validate"`
 	Tflint     *TflintScanResult `json:"tflint,omitempty"`
 	Scan       *ScanSection      `json:"scan,omitempty"`
+	Cost       *CostSection      `json:"cost,omitempty"`
+	Budget     *BudgetSection    `json:"budget,omitempty"`
 	RepoHash   string            `json:"repoHash,omitempty"`
 	CLIVersion string            `json:"cliVersion,omitempty"`
 }

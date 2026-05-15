@@ -89,12 +89,20 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		files[f.Name] = f.Content
 	}
 
+	// Resolve the bound project ID by walking up from the target. The
+	// server uses this to pull the per-project budget from BudgetSettings.
+	projectID := ""
+	if cfg, _, _ := config.FindRepo(target); cfg != nil {
+		projectID = cfg.ProjectID
+	}
+
 	client := api.New(userCfg.APIBaseURL, userCfg.APIKey)
 	start := time.Now()
 	result, err := client.ValidateIaC(&api.ValidateRequest{
 		Files:         files,
 		IacType:       validateIacType,
 		CloudProvider: validateProvider,
+		ProjectID:     projectID,
 	})
 	if err != nil {
 		return fmt.Errorf("validate failed: %w", err)
@@ -127,6 +135,8 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			Validate:   result.Validate,
 			Tflint:     result.Tflint,
 			Scan:       result.Scan,
+			Cost:       result.Cost,
+			Budget:     result.Budget,
 			RepoHash:   hex.EncodeToString(hash[:]),
 			CLIVersion: buildVersion,
 		})
@@ -147,6 +157,12 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if result.Scan != nil && scanHasBlockingFinding(result.Scan, validateScanFailOn) {
+		hardFail = true
+	}
+	// Budget enforcement: only gate when the server explicitly says
+	// (Enforced && Exceeded && BlockOnExceed). Anything else is reported
+	// but doesn't block the agent.
+	if result.Budget != nil && result.Budget.Enforced && result.Budget.Exceeded && result.Budget.BlockOnExceed {
 		hardFail = true
 	}
 	if hardFail {
@@ -268,6 +284,60 @@ func printValidateResult(cmd *cobra.Command, r *api.ValidateResponse, target str
 	if len(failed) > max {
 		fmt.Fprintf(out, "  ...and %d more (use --format=json to see all)\n", len(failed)-max)
 	}
+
+	// cost + budget block — printed last because it's the most "this is
+	// going to cost the agent / your wallet" signal. Cost is informational
+	// unless a budget is set AND exceeded AND blockOnExceed is true.
+	if r.Cost != nil && r.Cost.OK {
+		fmt.Fprintf(out, "\ncost: $%.2f / month across %d resource(s)\n", r.Cost.TotalMonthlyCost, len(r.Cost.Resources))
+		top := r.Cost.Resources
+		// Show the 5 most expensive resources so the agent sees which to
+		// optimize. Server already rounded to 2dp.
+		sortResourcesByCostDesc(top)
+		if len(top) > 5 {
+			top = top[:5]
+		}
+		for _, res := range top {
+			label := res.ResourceType
+			if label == "" {
+				label = "resource"
+			}
+			fmt.Fprintf(out, "  $%-9.2f  %s (%s)\n", res.MonthlyCost, res.Name, label)
+		}
+	} else if r.Cost != nil && r.Cost.Error != "" {
+		fmt.Fprintf(out, "\ncost: unavailable (%s)\n", r.Cost.Error)
+	}
+
+	if r.Budget != nil {
+		b := r.Budget
+		switch {
+		case !b.Enforced:
+			// Skip: enforcement off, nothing to surface.
+		case b.Limit == 0 && b.Reason != "":
+			fmt.Fprintf(out, "budget: %s\n", b.Reason)
+		case b.Exceeded && b.BlockOnExceed:
+			fmt.Fprintf(out, "\nbudget: ✗ BLOCKED — $%.2f/mo exceeds project limit of $%.2f/mo by $%.2f.\n",
+				b.MonthlyCost, b.Limit, b.OverBy)
+			fmt.Fprintln(out, "  Your organization has 'Block Deployments on Exceed' enabled.")
+			fmt.Fprintln(out, "  Trim resources, downsize instances, or remove the over-budget components,")
+			fmt.Fprintln(out, "  then ask Claude to suggest cheaper alternatives.")
+		case b.Exceeded:
+			fmt.Fprintf(out, "\nbudget: ⚠ $%.2f/mo exceeds project limit of $%.2f/mo by $%.2f (not blocked).\n",
+				b.MonthlyCost, b.Limit, b.OverBy)
+		default:
+			fmt.Fprintf(out, "\nbudget: ✓ $%.2f/mo within project limit of $%.2f/mo.\n", b.MonthlyCost, b.Limit)
+		}
+	}
+}
+
+// sortResourcesByCostDesc sorts the slice in place, biggest monthly cost
+// first. Same insertion-sort pattern as sortByRank — slice is small.
+func sortResourcesByCostDesc(rs []api.CostResource) {
+	for i := 1; i < len(rs); i++ {
+		for j := i; j > 0 && rs[j].MonthlyCost > rs[j-1].MonthlyCost; j-- {
+			rs[j], rs[j-1] = rs[j-1], rs[j]
+		}
+	}
 }
 
 // sortByRank is an in-place insertion sort over the severity rank map.
@@ -298,6 +368,10 @@ func shouldReportValidate(r *api.ValidateResponse) bool {
 		if r.Scan.Summary.ParsingErrors > 0 || r.Scan.Summary.Failed > 0 {
 			return true
 		}
+	}
+	// Budget violations are worth recording even when nothing else fails.
+	if r.Budget != nil && r.Budget.Enforced && r.Budget.Exceeded {
+		return true
 	}
 	return false
 }

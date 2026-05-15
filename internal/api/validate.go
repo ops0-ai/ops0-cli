@@ -17,10 +17,16 @@ import (
 //
 // Files map keys are relative paths under the working root; values are the
 // file contents. Path traversal is rejected server-side.
+//
+// `ProjectID` lets the server resolve the org's per-project budget so a
+// cost overrun against that project becomes a hard exit. If omitted, the
+// server falls back to the org's global budget (if any) and otherwise
+// reports cost as informational.
 type ValidateRequest struct {
 	Files         map[string]string `json:"files"`
 	IacType       string            `json:"iacType,omitempty"`       // terraform | opentofu | oxid
 	CloudProvider string            `json:"cloudProvider,omitempty"` // aws | gcp | azure | oracle
+	ProjectID     string            `json:"projectId,omitempty"`
 }
 
 // ValidateResponse is the JSON shape returned by the server.
@@ -34,7 +40,40 @@ type ValidateResponse struct {
 	Validate ValidateSection   `json:"validate"`
 	Tflint   *TflintScanResult `json:"tflint,omitempty"`
 	Scan     *ScanSection      `json:"scan,omitempty"`
+	Cost     *CostSection      `json:"cost,omitempty"`
+	Budget   *BudgetSection    `json:"budget,omitempty"`
 	Error    string            `json:"error,omitempty"`
+}
+
+// CostSection holds Infracost output. nil/ok=false means cost stage
+// failed (no API key, network blip, unsupported provider). The CLI
+// treats absent cost as informational, not blocking.
+type CostSection struct {
+	OK               bool           `json:"ok"`
+	TotalMonthlyCost float64        `json:"totalMonthlyCost"`
+	Resources        []CostResource `json:"resources"`
+	Error            string         `json:"error,omitempty"`
+}
+
+type CostResource struct {
+	Name         string  `json:"name"`
+	ResourceType string  `json:"resourceType,omitempty"`
+	MonthlyCost  float64 `json:"monthlyCost"`
+	HourlyCost   float64 `json:"hourlyCost,omitempty"`
+}
+
+// BudgetSection is the result of evaluating the org's BudgetSettings
+// against the cost estimate. Present only when the server computed it
+// (cost available + org has settings). The CLI gates on (Enforced &&
+// Exceeded && BlockOnExceed); other combinations are info-only.
+type BudgetSection struct {
+	Enforced      bool    `json:"enforced"`
+	Limit         float64 `json:"limit,omitempty"`
+	MonthlyCost   float64 `json:"monthlyCost,omitempty"`
+	OverBy        float64 `json:"overBy,omitempty"`
+	Exceeded      bool    `json:"exceeded,omitempty"`
+	BlockOnExceed bool    `json:"blockOnExceed,omitempty"`
+	Reason        string  `json:"reason,omitempty"`
 }
 
 // ScanSection mirrors the shape returned by iac-service /internal/scan-files
