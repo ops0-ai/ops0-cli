@@ -4,10 +4,11 @@
 
 **Policy, lint, vulnerability, and cost guardrails for AI coding agents.**
 
-Sits in front of Claude Code, Codex and Gemini CLI. Every IaC edit the agent
-makes gets validated, linted, policy-checked, security-scanned, and
-cost-estimated server-side, with failures surfaced back to the model as a
-failed tool call. Destructive commands are blocked before they run.
+Sits in front of Claude Code, Codex and Gemini CLI. Every time the agent
+finishes writing IaC, the whole working directory gets validated, linted,
+policy-checked, security-scanned, and cost-estimated server-side. Failures
+come back as a failed tool call so the agent self-remediates. Destructive
+commands are blocked before they run.
 
 [![Latest Release](https://img.shields.io/github/v/release/ops0-ai/ops0-cli?display_name=tag&sort=semver)](https://github.com/ops0-ai/ops0-cli/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -18,10 +19,11 @@ curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | 
 ```
 
 [Quick start](#quick-start)
-· [What runs on every edit](#what-runs-on-every-edit)
+· [What runs at end-of-turn](#what-runs-at-end-of-turn)
 · [How agents trigger it](#how-agents-trigger-it)
+· [Monorepos](#monorepos)
 · [ops0-scan.md](#the-ops0-scanmd-report)
-· [FAQ](#faq)
+· [Commands](#commands)
 
 </div>
 
@@ -37,22 +39,22 @@ will happily generate a public S3 bucket, an open security group, or an
 oversized EC2 fleet. By the time CI catches it, the agent has moved on.
 
 `ops0` sits in front of the agent. It runs your organization's checks
-before the agent considers an edit done, blocks destructive commands
-before they execute, tells the agent how much its IaC will cost per
-month, and gates the change against the project's budget.
+when the agent finishes a turn, blocks destructive commands before they
+execute, tells the agent how much its IaC will cost per month, and gates
+the change against the project's budget.
 
 ## What it does
 
 | | |
 |---|---|
-| **Validates IaC after every edit** | A `PostToolUse` hook runs `ops0 validate` against every `.tf` / `.tofu` / `.hcl` / `.tfvars` file the agent writes. Server-side pipeline catches everything in one call. |
-| **Blocks destroy commands** | A `PreToolUse` hook intercepts `terraform destroy`, `tofu destroy`, `oxid destroy` and the `-destroy` variants. Override with `OPS0_ALLOW_DESTROY=1`. |
+| **Validates at end-of-turn, not per file save** | A `Stop` hook fires when the agent finishes its turn. `ops0 validate` runs once against the complete working directory. Validating mid-construction was noisy on half-written modules; validating the finished module is clean. |
+| **Blocks destroy commands** | A `PreToolUse` hook intercepts `terraform destroy`, `tofu destroy`, `oxid destroy` and the `-destroy` variants — before they run. Override with `OPS0_ALLOW_DESTROY=1`. |
 | **Enforces project budgets** | If the cost estimate exceeds a project budget set in the ops0 dashboard, the gate fails. Agent gets told to optimize. |
 | **Writes a fresh report file** | `ops0-scan.md` is rewritten at the repo root after every run, so the agent reads one file to know the current state across all stages. |
 | **Speaks MCP** | `ops0 mcp serve` exposes `list_policies` and `check_compliance` to any MCP-compatible agent. Registered automatically with Claude Code on `ops0 init`. |
-| **Multi-project aware** | Walks up from the edited file to find the nearest `.ops0/config.json`. One repo with ten subprojects each maps to its own ops0 project. |
+| **Multi-project aware** | Walks up *and* down from the workspace root to find the nearest `.ops0/config.json` (up to 12 levels deep). One repo with many subprojects each maps to its own ops0 project. |
 | **Audit trail** | Every failed lint finding, policy violation, vulnerability, blocked destroy, and budget overrun is recorded against your API key in `Settings → API Keys → Activity`. |
-| **Works everywhere** | Hooks install at both project-level and user-level, so they fire no matter which directory Claude Code opens at. |
+| **Works from any workspace root** | Hooks install at both project-level and user-level, so they fire no matter where Claude Code is opened. |
 
 ## Quick start
 
@@ -67,9 +69,10 @@ ops0 login --api-base https://brew.ops0.ai
 cd ~/work/my-terraform-repo
 ops0 init --project=<project-id>
 
-# 4. Open Claude Code (or Codex/Gemini) in the repo and write some Terraform.
-#    Every .tf edit triggers the full pipeline. Try `terraform destroy`
-#    and watch it get blocked.
+# 4. Open Claude Code (or Codex / Gemini) anywhere in or above the repo.
+#    Write Terraform freely. When the agent stops, the gate fires once
+#    against the whole module. Try `terraform destroy` and watch it get
+#    blocked before it runs.
 ```
 
 Verify the wiring:
@@ -102,10 +105,10 @@ cost: $284.50 / month across 6 resource(s)
 budget: ✓ $284.50/mo within project limit of $500.00/mo.
 ```
 
-## What runs on every edit
+## What runs at end-of-turn
 
 A single `ops0 validate` call fans out to **five** server-side stages, in
-this order. The CLI returns the merged result; failures gate the hook.
+this order. The CLI returns the merged result; failures gate the agent.
 
 | # | Stage | Catches | Fails the gate when... |
 |---|---|---|---|
@@ -116,47 +119,53 @@ this order. The CLI returns the merged result; failures gate the hook.
 | 5 | **Project budget** | per-project monthly limit from the ops0 dashboard | `enabled` AND `exceeded` AND `Block Deployments on Exceed` is on |
 
 All five run in one HTTPS call. With the server-side provider cache warm,
-the round-trip is ~5-12s per edit depending on repo size.
+end-of-turn validation is ~5-12s.
 
 ## How agents trigger it
 
 `ops0 init` writes hooks at both project- and user-level `.claude/settings.json`,
-so the gate fires regardless of which directory Claude Code opens at.
+so the gate fires regardless of which directory Claude Code is opened at.
 
 ```
-┌──────────────────────────────┐
-│   Claude Code / Codex /      │
-│   Gemini CLI writes a .tf    │
-└──────────────┬───────────────┘
-               │
-               │ PostToolUse hook (.claude/settings.json)
-               ▼
-   ┌─────────────────────────────────┐
-   │   ops0 validate "$file"         │
-   │   (walks up to find             │
-   │    .ops0/config.json)           │
-   └─────────────┬───────────────────┘
-                 │ HTTPS (API key)
-                 ▼
-   ┌─────────────────────────────────┐
-   │   ops0 platform                 │
-   │   - syntax validate             │
-   │   - lint                        │
-   │   - policies + vulnerabilities  │
-   │   - cost                        │
-   │   - project budget              │
-   └─────────────┬───────────────────┘
-                 │
-                 ▼
-   ┌─────────────────────────────────┐
-   │  exit 0 → agent moves on        │
-   │  exit ≠ 0 → hook fails →        │
-   │  agent gets stderr, retries     │
-   │                                 │
-   │  Either way: ops0-scan.md       │
-   │  is rewritten with the latest   │
-   │  state.                         │
-   └─────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│   Claude Code / Codex / Gemini writes        │
+│   .tf / .tofu / .hcl / .tfvars files         │
+│   in any order. No mid-turn gate fires.      │
+└──────────────────────┬───────────────────────┘
+                       │
+                       │ Agent finishes its turn
+                       ▼
+            Stop hook (.claude/settings.json)
+                       │
+                       ▼
+   ┌─────────────────────────────────────────┐
+   │   ops0 validate <bound-dir>             │
+   │   (walks up AND down from workspace     │
+   │    root, up to 12 levels deep, to       │
+   │    find the nearest .ops0/config.json)  │
+   └─────────────────┬───────────────────────┘
+                     │ HTTPS (API key)
+                     ▼
+   ┌─────────────────────────────────────────┐
+   │   ops0 platform                         │
+   │   - syntax validate                     │
+   │   - lint                                │
+   │   - policies + vulnerabilities          │
+   │   - cost                                │
+   │   - project budget                      │
+   └─────────────────┬───────────────────────┘
+                     │
+                     ▼
+   ┌─────────────────────────────────────────┐
+   │  exit 0 → turn ends normally            │
+   │  exit ≠ 0 → hook fails →                │
+   │  agent gets stderr, takes another turn  │
+   │  to remediate.                          │
+   │                                         │
+   │  Either way: ops0-scan.md is rewritten  │
+   │  and Activity rows land in the          │
+   │  dashboard.                             │
+   └─────────────────────────────────────────┘
 ```
 
 The user never has to ask "did you run the scan?". The gate is mechanical.
@@ -186,13 +195,59 @@ OPS0_ALLOW_DESTROY=1 terraform destroy
 
 The override is still logged to the audit trail.
 
+This hook is separate from the validate pipeline — it's a runtime safety
+gate, not a write-time gate.
+
+## Monorepos
+
+One repo, many subprojects, each with its own policies and budget? Open
+Claude Code anywhere in or above any of them. The Stop hook resolves the
+binding automatically:
+
+```
+my-monorepo/                                ← Claude Code opened here
+├── iaas/
+│   └── terraform/
+│       └── live/
+│           └── env/
+│               └── prod/
+│                   └── customer/
+│                       ├── alpha/
+│                       │   ├── .ops0/config.json    ← projectId: alpha
+│                       │   └── main.tf
+│                       └── beta/
+│                           ├── .ops0/config.json    ← projectId: beta
+│                           └── main.tf
+└── shared/
+    ├── .ops0/config.json                   ← projectId: shared
+    └── main.tf
+```
+
+How it finds the binding:
+
+1. Walk **up** from the workspace's current directory looking for the
+   nearest `.ops0/config.json`. If found, that's the target.
+2. Otherwise walk **down** the workspace tree up to **12 levels deep**
+   and take the nearest descendant. Pruned automatically:
+   `node_modules`, `.git`, `.terraform`, `dist`, `build`, `.next`, `.venv`,
+   `venv`. The scan stays fast on workspaces with large vendored trees.
+
+So you can open Claude Code at `~/my-monorepo/` and edit
+`iaas/terraform/live/env/prod/customer/alpha/main.tf` — the Stop hook
+walks down through 9 levels of directories, finds `alpha/.ops0/config.json`,
+and validates against the `alpha` project's policies + budget. Same edit
+in `beta/` resolves to the `beta` project independently.
+
+12-level depth covers any realistic IaC layout. If you need deeper, file
+an issue with your path shape and we'll bump it.
+
 ## The ops0-scan.md report
 
 After every `ops0 validate` run, the CLI rewrites a markdown file at the
 bound repo root:
 
 ```
-<repo>/ops0-scan.md
+<bound-dir>/ops0-scan.md
 ```
 
 It contains:
@@ -206,34 +261,10 @@ It contains:
 - Budget verdict (within limit / over by $X / blocked)
 
 The file is overwritten on every run, so it's always the current truth.
-Read it across turns without re-running validate. Don't hand-edit it
-(the next tool call will throw your changes away).
+The agent reads it between turns to see findings without re-running
+validate. Don't hand-edit it (the next run will throw your changes away).
 
 Disable with `--no-report`, or move it with `--report path/to/file.md`.
-
-## Multi-project monorepos
-
-One repo, ten subprojects, each with its own policies and budget? That
-works:
-
-```
-my-monorepo/
-├── prod/
-│   ├── .ops0/config.json     ← projectId: prod
-│   └── main.tf
-├── staging/
-│   ├── .ops0/config.json     ← projectId: staging
-│   └── main.tf
-└── shared/
-    ├── .ops0/config.json     ← projectId: shared
-    └── main.tf
-```
-
-When the hook fires on `prod/main.tf`, the CLI walks up from that file's
-directory to find `prod/.ops0/config.json` and runs `ops0 validate` against
-the `prod` project. Same edit in `staging/main.tf` resolves to `staging`.
-Each subproject's policies, vulnerability checks, and budget apply
-independently.
 
 ## Integrations
 
@@ -248,19 +279,18 @@ ops0 init --project=<project-id>
 That single command:
 
 - Writes `<cwd>/.ops0/config.json` to bind the directory to a project.
-- Installs `PostToolUse` (validate IaC), `PreToolUse` (block destroys),
-  and `Stop` (end-of-turn re-check) hooks in `<cwd>/.claude/settings.json`.
-- Installs the same hooks in `~/.claude/settings.json` so they fire whatever
-  directory you open Claude Code at. The user-level hook is gated on a
-  `.ops0/config.json` walk-up so unrelated repos aren't validated.
-- Appends a fenced governance section to `CLAUDE.md` so the agent reads
-  the rules before generating IaC, and knows to read `ops0-scan.md` for
-  the current state.
+- Installs `PreToolUse` (block destroys) and `Stop` (end-of-turn validate)
+  hooks in `<cwd>/.claude/settings.json`.
+- Installs the same hooks in `~/.claude/settings.json` so they fire
+  whatever directory Claude Code is opened at.
+- Appends a fenced governance section to `CLAUDE.md` so the agent knows
+  the rules and how to read `ops0-scan.md`.
 - Runs `claude mcp add ops0 ops0 mcp serve` so the agent can call
-  `list_policies` and `check_compliance` natively.
+  `list_policies` and `check_compliance` natively over MCP.
 
-Re-run `ops0 init --force` after upgrading the CLI to refresh the hook
-scripts.
+After upgrading the CLI, re-run `ops0 init --force` in the project
+directory to refresh the hooks, then **restart your Claude Code session**
+so it re-reads the hook config.
 
 ### Codex / Gemini CLI / any MCP client
 
@@ -296,6 +326,14 @@ Run it as a stdio MCP server. Tools exposed: `list_policies`,
 | `--report <path>` | `<bound-dir>/ops0-scan.md` | Where to write the report. |
 | `--no-report` | `false` | Skip writing the report file. |
 
+### `ops0 init` flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--project <id>` | `""` | ops0 IaC project ID to bind this directory to. Get it from the dashboard. |
+| `--force` | `false` | Overwrite an existing `.ops0/config.json` and refresh hook commands. |
+| `--skip-claude` | `false` | Don't write `.claude/settings.json` or register the MCP server. Useful in CI. |
+
 ## Config files
 
 | Path | Scope | Purpose |
@@ -305,45 +343,6 @@ Run it as a stdio MCP server. Tools exposed: `list_policies`,
 | `<dir>/.claude/settings.json` | Per-directory | Project-level Claude Code hooks |
 | `~/.claude/settings.json` | User-wide | User-level Claude Code hooks (fire from any workspace) |
 | `<dir>/ops0-scan.md` | Per-directory | Auto-generated scan report. Read it; don't edit it. |
-
-## FAQ
-
-**Does it send my Terraform to the cloud?**
-Yes, over HTTPS, scoped by your API key. Files live in a tempdir on the
-ops0 platform for the duration of the scan and are not persisted.
-
-**What happens if my CI runs `terraform apply`?**
-`apply` is intentionally not blocked. Blocking every `apply` would be
-unworkable. The right defense for `apply` is plan-aware, and that's on
-the roadmap. Today the focus is preventing the agent from writing bad
-IaC in the first place, and preventing it from tearing down what's there.
-
-**How do I let `terraform destroy` through for a planned tear-down?**
-Prefix the command with `OPS0_ALLOW_DESTROY=1`. The block still gets
-logged to the audit trail.
-
-**What if my org doesn't have project budgets set?**
-Budget enforcement is opt-in. Without it, cost is still computed and
-reported in the validate output and in `ops0-scan.md`, but never blocks.
-
-**I deleted `.ops0/config.json`. What happens?**
-The user-level hook walks up and finds nothing, so it exits 0. The
-directory is unbound. Nothing weird happens.
-
-**I have ten projects in one repo. Will the hook know which one?**
-Yes. The CLI walks up from the edited file to find the nearest
-`.ops0/config.json` and uses that project's policies + budget.
-
-**Does this work with anything other than Terraform?**
-Today: Terraform, OpenTofu, and Oxid via the `.tf`, `.tofu`, `.hcl`,
-`.tf.json`, `.tfvars`, and `.tfvars.json` extensions. Kubernetes
-manifests are next.
-
-**Can the agent skip the gate?**
-No. The hook fires mechanically on every Edit/Write/MultiEdit of an IaC
-file. The agent has no way to opt out — exiting non-zero from the hook
-fails the tool call as far as Claude Code is concerned. That's the whole
-point.
 
 ## Build from source
 
