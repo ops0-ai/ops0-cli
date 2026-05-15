@@ -116,23 +116,32 @@ func upsertClaudeMd(repoRoot string) error {
 	block := begin + `
 ## ops0 Governance (auto-managed by ` + "`ops0 init`" + `)
 
-This repository is governed by [ops0](https://brew.ops0.ai) policies. **Before
+This repository is governed by [ops0](https://brew.ops0.ai). **Before
 generating or modifying Infrastructure-as-Code (Terraform / OpenTofu / Oxid)
 in this repository:**
 
 1. Call ` + "`list_policies`" + ` on the ops0 MCP server (or run
    ` + "`ops0 policies list`" + ` in a shell) to see the rules that apply.
-2. After writing any ` + "`.tf` / `.tofu` / `.hcl`" + ` file, the PostToolUse
-   hook in ` + "`.claude/settings.json`" + ` will automatically run
-   ` + "`ops0 policies check`" + ` against the file. If it fails, **treat that
-   the same as a failing test** — fix the violation before considering the
-   task complete.
-3. The check uses both ops0's policy library (your org's Rego rules) and
-   Checkov security rules. A failing check blocks the suggestion.
+2. After writing any ` + "`.tf` / `.tofu` / `.hcl` / `.tfvars`" + ` file, the
+   ` + "`PostToolUse`" + ` hook in ` + "`.claude/settings.json`" + ` runs
+   ` + "`ops0 validate`" + ` against the working directory. The pipeline is
+   syntax validation → lint → policy + vulnerability scan → cost estimate →
+   project budget check. Any failure exits non-zero and the violation is
+   surfaced back to you. **Treat that the same as a failing test** — fix it
+   before considering the task complete.
+3. Destructive Bash commands (` + "`terraform destroy`" + `, ` + "`tofu destroy`" + `,
+   ` + "`oxid destroy`" + `) are blocked by the ` + "`PreToolUse`" + ` hook
+   before they run. To intentionally tear down a sandbox, prefix the command
+   with ` + "`OPS0_ALLOW_DESTROY=1`" + `.
+4. After every run, the consolidated report is rewritten at
+   ` + "`ops0-scan.md`" + ` at the repo root. Read this file to see the
+   current state of findings across all stages without re-running validate.
+   Do NOT hand-edit it — it's regenerated on every tool call.
 
-The ` + "`.ops0/config.json`" + ` file binds this repo to an ops0 IaC project.
+The ` + "`.ops0/config.json`" + ` file binds this repo to an ops0 project.
 Org-wide policies always apply; project-specific policies apply when the repo
-is bound.
+is bound. Project-level monthly budgets, when configured in the ops0
+dashboard, gate the agent if a change would push monthly cost over the limit.
 ` + end
 
 	data, err := os.ReadFile(path)
