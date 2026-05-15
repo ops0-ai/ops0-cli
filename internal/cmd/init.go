@@ -262,7 +262,12 @@ while [ "$d" != "/" ] && [ "$d" != "." ] && [ -n "$d" ]; do
   d="$(dirname "$d")"
 done
 if [ -z "$target" ]; then
-  cfg="$(find "$PWD" -maxdepth 5 -type f -path '*/.ops0/config.json' 2>/dev/null | head -1)"
+  # Walk down up to depth 12 so deep monorepos like
+  # iaas/terraform/live/env/prod/customer/<name>/.ops0/config.json
+  # (9 levels) still resolve. Prune common heavy dirs so the scan
+  # stays cheap even when the workspace has node_modules / .git /
+  # .terraform / etc.
+  cfg="$(find "$PWD" -maxdepth 12 \( -name node_modules -o -name .git -o -name .terraform -o -name dist -o -name build -o -name .next -o -name .venv -o -name venv \) -prune -o -type f -path '*/.ops0/config.json' -print 2>/dev/null | head -1)"
   if [ -n "$cfg" ]; then target="$(dirname "$(dirname "$cfg")")"; fi
 fi
 if [ -z "$target" ]; then exit 0; fi
