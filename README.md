@@ -58,22 +58,54 @@ the change against the project's budget.
 
 ## Quick start
 
+Follow these steps in order. The whole thing takes a couple of minutes.
+
+**1. Create an ops0 account.** Sign up at
+[https://brew.ops0.ai/](https://brew.ops0.ai/).
+
+**2. Open the API Keys page.** Go to
+[https://brew.ops0.ai/settings?tab=api-keys](https://brew.ops0.ai/settings?tab=api-keys).
+
+**3. Create an API key.** Click **New API Key**, give it a name (e.g.
+"my laptop"), create it, and copy the key. It is shown only once.
+
+**4. Install the CLI.**
+
 ```bash
-# 1. Install
 curl -fsSL https://raw.githubusercontent.com/ops0-ai/ops0-cli/main/install.sh | sh
-
-# 2. Auth: get a key at https://brew.ops0.ai/settings?tab=api-keys
-ops0 login --api-base https://brew.ops0.ai
-
-# 3. Bind a repo (or any subdir) to an ops0 project
-cd ~/work/my-terraform-repo
-ops0 init --project=<project-id>
-
-# 4. Open Claude Code (or Codex / Gemini) anywhere in or above the repo.
-#    Write Terraform freely. When the agent stops, the gate fires once
-#    against the whole module. Try `terraform destroy` and watch it get
-#    blocked before it runs.
 ```
+
+**5. Log in and paste the key.**
+
+```bash
+ops0 login --api-base https://brew.ops0.ai
+# paste the key from step 3 when prompted
+```
+
+**6. Initialize your repo.** This step is where you optionally bind to an
+ops0 project. You do not have to.
+
+```bash
+cd ~/work/my-terraform-repo
+
+# Without a project — org-wide policies, lint, vulnerability and cost
+# checks apply:
+ops0 init
+
+# Or with a project — also enforces that project's specific policies
+# and monthly budget:
+ops0 init --project=<project-id>
+```
+
+Now open your coding agent (Claude Code, Codex, Gemini CLI) anywhere in or
+above the repo and write Terraform freely. When the agent finishes its
+turn, the gate fires once against the whole module. Try `terraform destroy`
+and watch it get blocked before it runs.
+
+**7. Track everything.** Every finding, blocked command, and budget overrun
+shows up at
+[https://brew.ops0.ai/settings?tab=api-keys&view=activity](https://brew.ops0.ai/settings?tab=api-keys&view=activity),
+with charts on the Insights sub-tab.
 
 Verify the wiring:
 
