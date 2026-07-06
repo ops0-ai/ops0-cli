@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/ops0-ai/ops0-cli/internal/api"
 	"github.com/ops0-ai/ops0-cli/internal/config"
@@ -159,6 +160,14 @@ var toolList = []map[string]any{
 			"required": []string{"templateId"},
 		},
 	},
+	{
+		"name":        "get_iac_standards",
+		"description": "Return the authoritative IaC output contract for the current ops0 org (required tags, provider-specific field names for tags/labels, README + docs structure, Mermaid syntax rules, project-scoped recommendations). Call this ONCE per session, before writing the first module - the response supersedes the static baseline in CLAUDE.md when the two disagree.",
+		"inputSchema": map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
+	},
 }
 
 func (s *server) handleToolsList(req *rpcRequest) {
@@ -189,6 +198,8 @@ func (s *server) handleToolsCall(req *rpcRequest) {
 	case "get_finding_details":
 		tid, _ := params.Arguments["templateId"].(string)
 		s.toolGetFindingDetails(req.ID, tid)
+	case "get_iac_standards":
+		s.toolGetIaCStandards(req.ID)
 	default:
 		s.writeError(req.ID, -32601, "unknown tool: "+params.Name)
 	}
@@ -258,6 +269,113 @@ func (s *server) toolGetFindingDetails(id json.RawMessage, _ string) {
 			},
 		},
 	})
+}
+
+// toolGetIaCStandards forwards the org's authoritative IaC contract
+// (tags, docs, mermaid rules, recommendations) to the agent. Both a
+// human-readable summary and the raw JSON structure are returned so
+// the agent can parse deterministically OR reason from prose depending
+// on how it prefers to consume tool output.
+func (s *server) toolGetIaCStandards(id json.RawMessage) {
+	client, projectID, err := bootstrapClient()
+	if err != nil {
+		s.toolError(id, err)
+		return
+	}
+	standards, err := client.GetIaCStandards(projectID)
+	if err != nil {
+		s.toolError(id, err)
+		return
+	}
+
+	summary := formatIaCStandardsSummary(standards)
+	raw, _ := json.MarshalIndent(standards, "", "  ")
+
+	s.write(&rpcResponse{
+		ID: id,
+		Result: map[string]any{
+			"content": []map[string]any{
+				{"type": "text", "text": summary + "\n\nFull JSON contract (for programmatic access):\n\n" + string(raw)},
+			},
+		},
+	})
+}
+
+// formatIaCStandardsSummary renders a compact, agent-friendly view of
+// the standards. The full JSON is appended by the caller for agents that
+// want to parse it directly.
+func formatIaCStandardsSummary(s *api.IaCStandards) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "IaC Standards for this project (server-authoritative — supersedes CLAUDE.md baseline):\n\n")
+
+	// Tags
+	fmt.Fprintf(&b, "Required tags (%d):\n", len(s.RequiredTags))
+	for _, t := range s.RequiredTags {
+		req := "required"
+		if !t.Required {
+			req = "recommended"
+		}
+		val := ""
+		if t.FixedValue != "" {
+			val = fmt.Sprintf(" = %q", t.FixedValue)
+		} else if len(t.AllowedValues) > 0 {
+			val = fmt.Sprintf(" ∈ %v", t.AllowedValues)
+		} else if t.SuggestedVariable != "" {
+			val = fmt.Sprintf(" (%s)", t.SuggestedVariable)
+		}
+		fmt.Fprintf(&b, "  - %s [%s]%s — %s\n", t.Key, req, val, t.Description)
+	}
+	fmt.Fprintf(&b, "\nProvider-specific tag field:\n")
+	for provider, info := range s.ProviderTagField {
+		fmt.Fprintf(&b, "  - %s: %s (%s) — %s\n", provider, info.Field, info.Casing, info.Note)
+	}
+
+	// Docs
+	fmt.Fprintf(&b, "\nDocumentation contract:\n")
+	fmt.Fprintf(&b, "  - %s (%s): %d sections\n", s.Documentation.Readme.Path,
+		requiredWord(s.Documentation.Readme.Required), len(s.Documentation.Readme.Sections))
+	for i, sec := range s.Documentation.Readme.Sections {
+		fmt.Fprintf(&b, "      %d. %s\n", i+1, sec)
+	}
+	fmt.Fprintf(&b, "  - %s (conditional): %s\n", s.Documentation.ArchitectureDoc.Path, s.Documentation.ArchitectureDoc.When)
+	fmt.Fprintf(&b, "  - %s (conditional): %s\n", s.Documentation.RunbookDoc.Path, s.Documentation.RunbookDoc.When)
+
+	// Mermaid
+	fmt.Fprintf(&b, "\nMermaid syntax rules:\n")
+	fmt.Fprintf(&b, "  - Fence: %s\n", s.MermaidRules.FenceFormat)
+	fmt.Fprintf(&b, "  - Direction modifiers: %s\n", s.MermaidRules.DirectionModifiers)
+	fmt.Fprintf(&b, "  - architecture-beta labels: %s\n", s.MermaidRules.ArchitectureBeta.Labels)
+	fmt.Fprintf(&b, "  - architecture-beta IDs: %s\n", s.MermaidRules.ArchitectureBeta.IDs)
+	fmt.Fprintf(&b, "  - architecture-beta icons: %s\n", s.MermaidRules.ArchitectureBeta.Icons)
+	fmt.Fprintf(&b, "  - architecture-beta edges: %s\n", s.MermaidRules.ArchitectureBeta.Edges)
+	fmt.Fprintf(&b, "  - architecture-beta parents: %s\n", s.MermaidRules.ArchitectureBeta.Parents)
+
+	// Recommendations
+	if len(s.Recommendations) == 0 {
+		fmt.Fprintf(&b, "\nRecommendations for this project: none currently surfaced.\n")
+	} else {
+		fmt.Fprintf(&b, "\nRecommendations for this project (%d):\n", len(s.Recommendations))
+		for _, r := range s.Recommendations {
+			status := "not adopted"
+			if r.Adopted {
+				status = "adopted"
+			}
+			impact := ""
+			if r.EstimatedMonthlyImpactUSD != 0 {
+				impact = fmt.Sprintf(" (~$%.0f/mo)", r.EstimatedMonthlyImpactUSD)
+			}
+			fmt.Fprintf(&b, "  - [%s] %s [%s]%s: %s\n", r.Category, r.Title, status, impact, r.Detail)
+		}
+	}
+
+	return b.String()
+}
+
+func requiredWord(required bool) string {
+	if required {
+		return "required"
+	}
+	return "optional"
 }
 
 func (s *server) toolError(id json.RawMessage, err error) {

@@ -51,7 +51,8 @@ the change against the project's budget.
 | **Blocks destroy commands** | A `PreToolUse` hook intercepts `terraform destroy`, `tofu destroy`, `oxid destroy` and the `-destroy` variants — before they run. Override with `OPS0_ALLOW_DESTROY=1`. |
 | **Enforces project budgets** | If the cost estimate exceeds a project budget set in the ops0 dashboard, the gate fails. Agent gets told to optimize. |
 | **Writes a fresh report file** | `ops0-scan.md` is rewritten at the repo root after every run, so the agent reads one file to know the current state across all stages. |
-| **Speaks MCP** | `ops0 mcp serve` exposes `list_policies` and `check_compliance` to any MCP-compatible agent. Registered automatically with Claude Code on `ops0 init`. |
+| **Grounds the agent upstream, not just at the gate** | `ops0 init` writes a governance block into `CLAUDE.md` covering the mandatory tag set (`Environment`, `Project`, `Owner`, `ManagedBy=ops0`, `ManagedIaC`, `CostCenter`), the required `README.md` + `docs/` structure, and how to surface platform recommendations. The agent authors conformant IaC on turn 1 instead of round-tripping through failed policy checks. |
+| **Speaks MCP** | `ops0 mcp serve` exposes `list_policies`, `check_compliance`, `get_finding_details`, and `get_iac_standards` to any MCP-compatible agent. `get_iac_standards` returns the org's live tag / doc / Mermaid contract — supersedes the static `CLAUDE.md` baseline when reachable. Registered automatically with Claude Code on `ops0 init`. |
 | **Multi-project aware** | Walks up *and* down from the workspace root to find the nearest `.ops0/config.json` (up to 12 levels deep). One repo with many subprojects each maps to its own ops0 project. |
 | **Audit trail** | Every failed lint finding, policy violation, vulnerability, blocked destroy, and budget overrun is recorded against your API key in `Settings → API Keys → Activity`. |
 | **Works from any workspace root** | Hooks install at both project-level and user-level, so they fire no matter where Claude Code is opened. |
@@ -315,10 +316,15 @@ That single command:
   hooks in `<cwd>/.claude/settings.json`.
 - Installs the same hooks in `~/.claude/settings.json` so they fire
   whatever directory Claude Code is opened at.
-- Appends a fenced governance section to `CLAUDE.md` so the agent knows
-  the rules and how to read `ops0-scan.md`.
+- Appends a fenced governance section to `CLAUDE.md` covering (a) how the
+  gate works and how to read `ops0-scan.md`, (b) the mandatory tag set
+  every resource must carry, (c) the `README.md` + `docs/` structure the
+  agent should generate when asked for documentation, (d) how to surface
+  platform recommendations. Re-running `ops0 init --force` refreshes the
+  fenced block without touching your other edits.
 - Runs `claude mcp add ops0 ops0 mcp serve` so the agent can call
-  `list_policies` and `check_compliance` natively over MCP.
+  `list_policies`, `check_compliance`, `get_finding_details`, and
+  `get_iac_standards` natively over MCP.
 
 After upgrading the CLI, re-run `ops0 init --force` in the project
 directory to refresh the hooks, then **restart your Claude Code session**
@@ -330,8 +336,23 @@ so it re-reads the hook config.
 ops0 mcp serve
 ```
 
-Run it as a stdio MCP server. Tools exposed: `list_policies`,
-`check_compliance`, `whoami`. Wire it up via your client's MCP config.
+Run it as a stdio MCP server. Tools exposed:
+
+- `list_policies` — policies in scope for the current directory's project.
+  Call before generating IaC so the rules are in the agent's context.
+- `check_compliance` — evaluate ops0 Rego policies against a Terraform
+  plan JSON. Returns violations or empty on pass.
+- `get_finding_details` — look up a Discovery security check by
+  `templateId` (e.g. `aws-s3-public-access-block-disabled`). Returns
+  description + remediation.
+- `get_iac_standards` — the authoritative IaC output contract for the
+  org (required tags, provider-specific field names for tags/labels,
+  `README.md` + `docs/` structure, Mermaid syntax rules,
+  project-scoped recommendations). Call once per session, before the
+  first module. The response supersedes the static `CLAUDE.md`
+  baseline whenever the two disagree.
+
+Wire it up via your client's MCP config.
 
 ## Commands
 

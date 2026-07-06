@@ -121,6 +121,30 @@ func (c *Client) ListPolicies(projectID string) ([]Policy, error) {
 	return out.Policies, nil
 }
 
+// GetIaCStandards fetches the authoritative IaC output contract (required
+// tags, documentation layout, mermaid syntax rules, project-scoped
+// recommendations) that the CLI's MCP tool `get_iac_standards` serves to
+// the agent at the start of each session.
+//
+// projectID may be empty; when set the response is enriched with
+// recommendations scoped to that ops0 IaC project.
+func (c *Client) GetIaCStandards(projectID string) (*IaCStandards, error) {
+	path := "/api/v1/cli/iac-standards"
+	if projectID != "" {
+		path += "?projectId=" + projectID
+	}
+	resp, err := c.do(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	out := &IaCStandards{}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReportCheck sends anonymized check results to the backend for audit
 // telemetry. Best-effort: callers should ignore errors so a network blip
 // never blocks a local check.

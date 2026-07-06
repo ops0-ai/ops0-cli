@@ -138,12 +138,18 @@ Other things to know:
    ` + "`ops0 policies list`" + ` in a shell) to see the rules that apply
    before generating IaC. Reading the rules first usually means fewer
    round trips through the gate.
-2. Destructive Bash commands (` + "`terraform destroy`" + `, ` + "`tofu destroy`" + `,
+2. Call ` + "`get_iac_standards`" + ` on the ops0 MCP server once per
+   session — before you write the first module — to fetch the live tag,
+   documentation, and recommendation contract for this project. The
+   sections below are a **static baseline** that always applies; the
+   MCP response supersedes them with anything the org has configured
+   (extra required tags, project-specific recommendations, etc).
+3. Destructive Bash commands (` + "`terraform destroy`" + `, ` + "`tofu destroy`" + `,
    ` + "`oxid destroy`" + `) are blocked by the ` + "`PreToolUse`" + ` hook
    before they run. This is a runtime safety gate, not part of validate.
    To intentionally tear down a sandbox, prefix the command with
    ` + "`OPS0_ALLOW_DESTROY=1`" + `.
-3. After every validate run, the consolidated report is rewritten at
+4. After every validate run, the consolidated report is rewritten at
    ` + "`ops0-scan.md`" + ` at the repo root. Read this file to see the
    current state of findings without re-running validate yourself. Do
    NOT hand-edit it — it's regenerated on every turn.
@@ -152,6 +158,77 @@ The ` + "`.ops0/config.json`" + ` file binds this repo to an ops0 project.
 Org-wide policies always apply; project-specific policies apply when the repo
 is bound. Project-level monthly budgets, when configured in the ops0
 dashboard, gate the agent if a change would push monthly cost over the limit.
+
+## Tags — MANDATORY on every resource that supports them
+
+Every resource in this repository MUST carry the following tags. Untagged
+or partially-tagged resources fail the policy gate at end-of-turn. This is
+a hard requirement, not a suggestion:
+
+| Tag | Required | Value |
+|---|---|---|
+| ` + "`Environment`" + ` | yes | ` + "`dev`" + ` / ` + "`staging`" + ` / ` + "`production`" + ` (via ` + "`var.environment`" + `) |
+| ` + "`Project`" + ` | yes | project identifier (via ` + "`var.project_name`" + `) |
+| ` + "`Owner`" + ` | yes | team or individual owning the resource (via ` + "`var.owner`" + `) |
+| ` + "`ManagedBy`" + ` | yes | literal string ` + "`\"ops0\"`" + ` |
+| ` + "`ManagedIaC`" + ` | yes | ` + "`terraform`" + ` / ` + "`opentofu`" + ` / ` + "`cloudformation`" + ` |
+| ` + "`CostCenter`" + ` | recommended | cost allocation code (via ` + "`var.cost_center`" + `) |
+
+Provider-specific field names for the same standard tag set:
+
+- **AWS + Azure**: ` + "`tags = { ... }`" + `
+- **GCP**: ` + "`labels = { ... }`" + ` — keys and values must be lowercase, dashes only
+- **Oracle Cloud**: ` + "`freeform_tags = { ... }`" + `
+
+If the org has configured additional required tags (Compliance, DataClassification,
+etc.), ` + "`get_iac_standards`" + ` returns the full authoritative list. Call it
+first when you're unsure.
+
+## Documentation — how to structure it
+
+When the user asks for documentation, a README, "explain how this works",
+"document the project", or anything documentation-shaped: **do NOT modify any
+` + "`.tf`" + ` / ` + "`.tfvars`" + ` files.** Generate Markdown instead.
+
+- ` + "`README.md`" + ` at the repo root — **always required.** Nine
+  sections in this order:
+    1. Project name + one-line tagline
+    2. What this provisions (short narrative)
+    3. Architecture — one Mermaid ` + "`architecture-beta`" + ` diagram
+    4. Modules — bullet list of every top-level ` + "`.tf`" + ` file and what it does
+    5. Inputs — table: ` + "`Name | Type | Description | Default | Required?`" + `
+    6. Outputs — table: ` + "`Name | Description | Sensitive?`" + `
+    7. Deploy — via ops0, not raw ` + "`terraform apply`" + `
+    8. Operate — drift / state / cost notes
+    9. Troubleshooting — known failure modes
+- ` + "`docs/architecture.md`" + ` — add ONLY when the project has more
+  than one module OR more than 15 resources. Sequence and data-flow
+  diagrams that don't belong in the README go here.
+- ` + "`docs/runbook.md`" + ` — add ONLY when the project provisions
+  production or customer-facing infrastructure. On-call response
+  playbooks.
+
+**Mermaid diagrams.** Every architecture / data-flow diagram must be inside
+a ` + "` ``` mermaid `" + ` fenced block. The diagram-type keyword
+(` + "`architecture-beta`" + `, ` + "`sequenceDiagram`" + `, ` + "`flowchart LR`" + `) goes on
+the FIRST LINE INSIDE the fence — never glued to the fence line. Direction
+modifiers are part of the type line: ` + "`flowchart LR`" + ` is one token, never
+split across two lines. For the full ` + "`architecture-beta`" + ` syntax rules
+(label quoting, service ID constraints, icon pack format, edge shape) call
+` + "`get_iac_standards`" + ` — the platform serves the authoritative version
+because Mermaid's parser is unforgiving and the rules evolve.
+
+## Recommendations — surface them, don't invent them
+
+The ops0 platform tracks cost, security, and drift recommendations per
+project. When you write or refresh ` + "`README.md`" + `, include a section
+titled **Recommended items** listing every recommendation returned by
+` + "`get_iac_standards`" + `. One bullet per item: what it does, whether
+it's been adopted in the current code, and (for cost items) the estimated
+monthly impact.
+
+Do NOT invent recommendations — only surface what the platform returned.
+When the recommendation set is empty, omit the section entirely.
 ` + end
 
 	data, err := os.ReadFile(path)

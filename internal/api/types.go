@@ -34,6 +34,83 @@ type policiesResponse struct {
 	Policies []Policy `json:"policies"`
 }
 
+// IaCStandards is the shape returned by GET /api/v1/cli/iac-standards.
+//
+// The CLI's MCP tool `get_iac_standards` forwards this response verbatim
+// to the agent so it can ground its output on the same tag / doc /
+// mermaid contract the ops0 web-UI IaC agent uses. When the server
+// disagrees with the static CLAUDE.md baseline, the server wins - that's
+// the whole reason the endpoint exists.
+type IaCStandards struct {
+	RequiredTags     []RequiredTag              `json:"requiredTags"`
+	ProviderTagField map[string]ProviderTagInfo `json:"providerTagField"`
+	Documentation    DocumentationContract      `json:"documentation"`
+	MermaidRules     MermaidRules               `json:"mermaidRules"`
+	Recommendations  []Recommendation           `json:"recommendations"`
+	Scope            StandardsScope             `json:"scope"`
+	Version          int                        `json:"version"`
+}
+
+type RequiredTag struct {
+	Key               string   `json:"key"`
+	Required          bool     `json:"required"`
+	Description       string   `json:"description,omitempty"`
+	SuggestedVariable string   `json:"suggestedVariable,omitempty"`
+	FixedValue        string   `json:"fixedValue,omitempty"`
+	AllowedValues     []string `json:"allowedValues,omitempty"`
+}
+
+type ProviderTagInfo struct {
+	Field  string `json:"field"`  // "tags" / "labels" / "freeform_tags"
+	Casing string `json:"casing"` // "PascalCase" / "lowercase"
+	Note   string `json:"note,omitempty"`
+}
+
+type DocumentationContract struct {
+	Readme          ReadmeSpec   `json:"readme"`
+	ArchitectureDoc DocSpec      `json:"architectureDoc"`
+	RunbookDoc      DocSpec      `json:"runbookDoc"`
+}
+
+type ReadmeSpec struct {
+	Path     string   `json:"path"`
+	Required bool     `json:"required"`
+	Sections []string `json:"sections"`
+}
+
+type DocSpec struct {
+	Path     string `json:"path"`
+	When     string `json:"when"`
+	Contents string `json:"contents"`
+}
+
+type MermaidRules struct {
+	FenceFormat        string                   `json:"fenceFormat"`
+	DirectionModifiers string                   `json:"directionModifiers"`
+	ArchitectureBeta   ArchitectureBetaRules    `json:"architectureBeta"`
+}
+
+type ArchitectureBetaRules struct {
+	Labels  string `json:"labels"`
+	IDs     string `json:"ids"`
+	Icons   string `json:"icons"`
+	Edges   string `json:"edges"`
+	Parents string `json:"parents"`
+}
+
+type Recommendation struct {
+	ID                        string  `json:"id"`
+	Category                  string  `json:"category"` // cost | security | drift | compliance
+	Title                     string  `json:"title"`
+	Detail                    string  `json:"detail"`
+	Adopted                   bool    `json:"adopted"`
+	EstimatedMonthlyImpactUSD float64 `json:"estimatedMonthlyImpactUsd,omitempty"`
+}
+
+type StandardsScope struct {
+	ProjectID *string `json:"projectId"`
+}
+
 // CheckReport is the telemetry payload sent by `ops0 policies check` when
 // telemetry is enabled. We never include source code — just policy IDs and
 // pass/fail counts plus a hash of the file paths so the dashboard can group
